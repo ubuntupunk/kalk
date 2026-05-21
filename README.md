@@ -2,8 +2,7 @@
 
 ![screenshot](kalk.png)
 
-A minimal spreadsheet for the terminal. Single C file, no dependencies
-beyond ncurses.
+A minimal spreadsheet for the terminal. No dependencies beyond ncurses.
 
 	$ kalk budget.csv
 
@@ -19,6 +18,16 @@ row/column operations, and frozen titles. Supports both traditional
 	make install PREFIX=/usr
 
 Requires a C99 compiler and ncurses.
+
+## Source files
+
+	cell.h      Shared header — types, constants, declarations
+	cell.c      Grid and cell operations
+	formula.c   Formula parser (arithmetic, functions)
+	csv.c       CSV file I/O
+	editor.c     Terminal UI (ncurses)
+	kalk.c      Main entry point
+	test.c      Unit tests
 
 ## Usage
 
@@ -81,10 +90,11 @@ The two syntaxes are fully compatible and can be mixed.
 | `INT` | Integer truncation | `=INT(A1)` |
 | `SQRT` | Square root | `=SQRT(A1)` |
 | `ROUND` | Round to N decimal places | `=ROUND(A1, 2)` |
-| `ROUNDUP` | Round up (ceiling) | `=ROUNDUP(A1, 2)` |
-| `ROUNDDOWN` | Round down (floor) | `=ROUNDDOWN(A1, 2)` |
+| `ROUNDUP` | Round up | `=ROUNDUP(A1, 2)` |
+| `ROUNDDOWN` | Round down | `=ROUNDDOWN(A1, 2)` |
 | `CEILING` | Round up to integer | `=CEILING(A1)` |
 | `FLOOR` | Round down to integer | `=FLOOR(A1)` |
+| `IF` | Conditional: if cond is truthy, return a else b | `=IF(A1>0, A2, A3)` |
 
 Cell references adjust automatically on replicate, insert, and delete.
 Use `$` for absolute references: `$A$1` (fixed), `$A1` (fixed column),
