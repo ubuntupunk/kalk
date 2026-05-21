@@ -842,6 +842,121 @@ void test_sort_with_refs(void) {
   assert(g.cells[1][1].val == 30.0f);  // was B1=+A1, now B2, ref A2=30
 }
 
+void test_text_functions(void) {
+  static struct grid g = {0};
+  struct parser p = {0};
+#define EXPR(e) (p.s = p.p = e, p.g = &g, p.arg_str[0] = '\0', p.has_str_result = 0, cmp(&p))
+
+  // Setup: A1="hello" (LABEL), A2=42 (NUM), A3="  spaces  " (LABEL), A4="" (LABEL)
+  setcell(&g, 0, 0, "hello");
+  setcell(&g, 0, 1, "42");
+  setcell(&g, 0, 2, "  spaces  ");
+  setcell(&g, 0, 3, "");  // empty
+
+  // LEN
+  assert(EXPR("LEN(A1))") == 5.0f);       // "hello" → 5
+  assert(EXPR("LEN(\"hello\"))") == 5.0f);  // string literal
+  assert(EXPR("LEN(A2))") == 2.0f);       // "42" → 2
+  assert(EXPR("LEN(A3))") == 10.0f);      // "  spaces  " → 10
+  assert(EXPR("LEN(\"\"))") == 0.0f);      // empty literal
+
+  // FIND
+  assert(EXPR("FIND(\"ell\", A1))") == 2.0f);   // "ell" in "hello" at pos 2 (1-indexed)
+  assert(EXPR("FIND(\"lo\", A1))") == 4.0f);     // "lo" in "hello" at pos 4
+  assert(isnan(EXPR("FIND(\"xyz\", A1))")));      // not found → NAN
+  assert(EXPR("FIND(\"h\", \"hello\"))") == 1.0f); // first char
+  assert(EXPR("FIND(\"o\", \"hello\"))") == 5.0f); // last char
+
+  // UPPER (string-returning)
+  {
+    p.arg_str[0] = '\0'; p.has_str_result = 0;
+    EXPR("UPPER(A1))");
+    assert(p.has_str_result == 1);
+    assert(strcmp(p.arg_str, "HELLO") == 0);
+  }
+
+  // LOWER
+  {
+    p.arg_str[0] = '\0'; p.has_str_result = 0;
+    setcell(&g, 1, 0, "WORLD");
+    EXPR("LOWER(B1))");
+    assert(p.has_str_result == 1);
+    assert(strcmp(p.arg_str, "world") == 0);
+  }
+
+  // TRIM
+  {
+    p.arg_str[0] = '\0'; p.has_str_result = 0;
+    EXPR("TRIM(A3))");
+    assert(p.has_str_result == 1);
+    assert(strcmp(p.arg_str, "spaces") == 0);
+  }
+
+  // LEFT
+  {
+    p.arg_str[0] = '\0'; p.has_str_result = 0;
+    EXPR("LEFT(A1, 2))");
+    assert(p.has_str_result == 1);
+    assert(strcmp(p.arg_str, "he") == 0);
+  }
+  {
+    p.arg_str[0] = '\0'; p.has_str_result = 0;
+    EXPR("LEFT(\"hello\", 10))");  // n > string length
+    assert(p.has_str_result == 1);
+    assert(strcmp(p.arg_str, "hello") == 0);
+  }
+
+  // RIGHT
+  {
+    p.arg_str[0] = '\0'; p.has_str_result = 0;
+    EXPR("RIGHT(A1, 3))");
+    assert(p.has_str_result == 1);
+    assert(strcmp(p.arg_str, "llo") == 0);
+  }
+  {
+    p.arg_str[0] = '\0'; p.has_str_result = 0;
+    EXPR("RIGHT(\"hello\", 1))");
+    assert(p.has_str_result == 1);
+    assert(strcmp(p.arg_str, "o") == 0);
+  }
+
+  // MID
+  {
+    p.arg_str[0] = '\0'; p.has_str_result = 0;
+    EXPR("MID(A1, 2, 3))");  // start=2, n=3 → "ell"
+    assert(p.has_str_result == 1);
+    assert(strcmp(p.arg_str, "ell") == 0);
+  }
+  {
+    p.arg_str[0] = '\0'; p.has_str_result = 0;
+    EXPR("MID(\"hello\", 1, 5))");  // full string
+    assert(p.has_str_result == 1);
+    assert(strcmp(p.arg_str, "hello") == 0);
+  }
+
+  // CONCATENATE
+  {
+    p.arg_str[0] = '\0'; p.has_str_result = 0;
+    EXPR("CONCATENATE(A1, \" \", A3))");
+    assert(p.has_str_result == 1);
+    assert(strcmp(p.arg_str, "hello   spaces  ") == 0);
+  }
+
+  // Nested: LEN(UPPER(A1)) = LEN("HELLO") = 5
+  assert(EXPR("LEN(UPPER(A1)))") == 5.0f);
+
+  // String literal as standalone formula value (via arg_str side channel)
+  // ="hello" style — parsed in primary, sets has_str_result
+  {
+    p.arg_str[0] = '\0'; p.has_str_result = 0;
+    EXPR("\"hello\")");
+    assert(p.has_str_result == 1);
+    assert(strcmp(p.arg_str, "hello") == 0);
+  }
+
+#undef EXPR
+}
+
 void test_color_cond_fields(void) {
   static struct grid g = {0};
 
@@ -906,5 +1021,6 @@ int main(void) {
   test_sort_labels_sink();
   test_sort_with_refs();
   test_color_cond_fields();
+  test_text_functions();
   return 0;
 }

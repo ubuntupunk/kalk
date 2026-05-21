@@ -18,6 +18,8 @@ struct cell {
   int bg;      // 0=default, 1-7=background color
   int attr;    // 0=normal 1=A_BOLD 2=A_ITALIC 3=A_BOLD|A_ITALIC
   char cond[64];  // conditional format rule e.g. ">5", "=0" (empty = none)
+  char strval[MAXIN];  // evaluated string value (for LABELs and string-returning formulas)
+  int is_str;          // 1 if cell value is a string result (from string-returning formula)
 };
 
 struct grid {
@@ -29,6 +31,8 @@ struct grid {
 struct parser {
   const char *s, *p;
   struct grid* g;
+  char arg_str[MAXIN];  // current string argument/result (side channel)
+  int has_str_result;   // 1 if current expression produced a string result
 };
 
 // Cell operations
@@ -52,6 +56,9 @@ void sortbycol(struct grid* g, int col);
 
 // Column name utility
 char* col(int c);
+
+// String value from a cell (text for LABEL, strval for formulas, formatted for NUM)
+const char* cell_str(struct grid* g, int c, int r);
 
 // Formula parser
 float expr(struct parser* p);

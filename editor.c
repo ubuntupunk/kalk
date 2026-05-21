@@ -16,6 +16,8 @@ static void fmtcell(struct grid* g, struct cell* cl, char* fb, int cw) {
     fb[cw] = '\0';
   } else if (cl->type == LABEL) {
     snprintf(fb, cw + 1, "%-*.*s", cw, cw, cl->text[0] == '"' ? cl->text + 1 : cl->text);
+  } else if (cl->is_str && cl->strval[0]) {
+    snprintf(fb, cw + 1, "%-*.*s", cw, cw, cl->strval);
   } else if (isnan(cl->val)) {
     snprintf(fb, cw + 1, "%*s", cw, "ERROR");
   } else {
@@ -55,9 +57,13 @@ static void draw(struct grid* g, const char* mode, const char* buf) {
   mvprintw(0, 0, " %s%d", col(g->cc), g->cr + 1);
   if (cur && cur->type == NUM)
     printw("  %.10g", cur->val);
-  else if (cur && cur->type == FORMULA)
-    printw("  %s = %s%.10g", cur->text, isnan(cur->val) ? "ERR " : "",
-           isnan(cur->val) ? 0.0 : cur->val);
+  else if (cur && cur->type == FORMULA) {
+    if (cur->is_str)
+      printw("  %s = \"%s\"", cur->text, cur->strval);
+    else
+      printw("  %s = %s%.10g", cur->text, isnan(cur->val) ? "ERR " : "",
+             isnan(cur->val) ? 0.0 : cur->val);
+  }
   else if (cur && cur->type == LABEL)
     printw("  %s", cur->text);
   mvprintw(0, COLS - 6, "%s", mode);

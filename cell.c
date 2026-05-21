@@ -1,6 +1,7 @@
 #define _POSIX_C_SOURCE 200809L
 #include "cell.h"
 #include <ctype.h>
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -18,10 +19,25 @@ void recalc(struct grid* g) {
       for (int c = 0; c < NCOL; c++) {
         struct cell* cl = &g->cells[c][r];
         if (cl->type != FORMULA) continue;
-        struct parser p = {cl->text, cl->text, g};
+        struct parser p;
+        p.s = cl->text;
+        p.p = cl->text;
+        p.g = g;
+        p.arg_str[0] = '\0';
+        p.has_str_result = 0;
         float v = cmp(&p);
         if (v != cl->val) changed = 1;
         cl->val = v;
+        if (p.has_str_result) {
+          strncpy(cl->strval, p.arg_str, MAXIN - 1);
+          cl->is_str = 1;
+        } else if (!isnan(v)) {
+          snprintf(cl->strval, MAXIN, "%g", v);
+          cl->is_str = 0;
+        } else {
+          cl->strval[0] = '\0';
+          cl->is_str = 0;
+        }
       }
     if (!changed) break;
   }
@@ -144,12 +160,16 @@ void setcell(struct grid* g, int c, int r, const char* input) {
   if (!cl) return;
   if (!*input) {
     *cl = (struct cell){0};
+    cl->strval[0] = '\0';
+    cl->is_str = 0;
     recalc(g);
     return;
   }
 
   strncpy(cl->text, input, MAXIN - 1);
   g->dirty = 1;
+  cl->strval[0] = '\0';
+  cl->is_str = 0;
 
   if (input[0] == '+' || input[0] == '-' || input[0] == '(' || input[0] == '@' || input[0] == '=') {
     cl->type = FORMULA;
@@ -157,12 +177,25 @@ void setcell(struct grid* g, int c, int r, const char* input) {
     char* end;
     double v = strtod(input, &end);
     cl->type = (*end == '\0') ? NUM : FORMULA;
-    if (cl->type == NUM) cl->val = v;
+    if (cl->type == NUM) {
+      cl->val = v;
+      snprintf(cl->strval, MAXIN, "%g", v);
+    }
   } else {
     cl->type = LABEL;
     cl->val = 0;
+    cl->is_str = 1;
+    strncpy(cl->strval, input, MAXIN - 1);
   }
   recalc(g);
+}
+
+const char* cell_str(struct grid* g, int c, int r) {
+  struct cell* cl = cell(g, c, r);
+  if (!cl) return "";
+  if (cl->type == LABEL) return cl->text;
+  if (cl->strval[0]) return cl->strval;
+  return "";
 }
 
 char* col(int c) {

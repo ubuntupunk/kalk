@@ -2,6 +2,7 @@
 #include "cell.h"
 #include <ctype.h>
 #include <math.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -46,8 +47,47 @@ static float cellval(struct parser* p) {
   if (!n) return NAN;
   p->p += n;
   struct cell* cl = cell(p->g, c, r);
-  if (!cl) return NAN;
+  if (!cl) { p->arg_str[0] = '\0'; return NAN; }
+  // Set arg_str from cell's string value (side channel for text functions)
+  if (cl->type == LABEL) {
+    strncpy(p->arg_str, cl->text, MAXIN - 1);
+  } else if (cl->strval[0]) {
+    strncpy(p->arg_str, cl->strval, MAXIN - 1);
+  } else {
+    p->arg_str[0] = '\0';
+  }
   return cl->val;
+}
+
+// Read a string argument: string literal "hello" or expression via cmp()
+static void read_str_arg(struct parser* p, char* buf, int bufsz) {
+  skipws(p);
+  buf[0] = '\0';
+  // String literal
+  if (*p->p == '"') {
+    p->p++;
+    int i = 0;
+    while (*p->p && *p->p != '"' && i < bufsz - 1) {
+      if (*p->p == '"' && *(p->p + 1) == '"') {
+        p->p++;
+        buf[i++] = '"';
+        p->p++;
+      } else {
+        buf[i++] = *p->p++;
+      }
+    }
+    buf[i] = '\0';
+    if (*p->p == '"') p->p++;
+    return;
+  }
+  // Otherwise evaluate as expression — arg_str is set by cellval or string functions
+  p->arg_str[0] = '\0';
+  float v = cmp(p);
+  if (p->arg_str[0]) {
+    strncpy(buf, p->arg_str, bufsz - 1);
+  } else if (!isnan(v)) {
+    snprintf(buf, bufsz, "%g", v);
+  }
 }
 
 // Parse condition string like ">5", ">=10", "<0", "<=100", "=42", "<>7", "5"
@@ -323,6 +363,149 @@ float func(struct parser* p) {
       skipws(p);
       float fval = cmp(p);
       result = (cond != 0.0f && !isnan(cond)) ? tval : fval;
+
+    // --- Text functions ---
+    } else if (strcmp(fn, "LEN") == 0) {
+      char buf[MAXIN];
+      read_str_arg(p, buf, MAXIN);
+      result = (float)strlen(buf);
+    } else if (strcmp(fn, "FIND") == 0) {
+      char sub[MAXIN], str[MAXIN];
+      read_str_arg(p, sub, MAXIN);
+      skipws(p);
+      if (*p->p != ',') return NAN;
+      p->p++;
+      read_str_arg(p, str, MAXIN);
+      const char* pos = strstr(str, sub);
+      result = pos ? (float)(pos - str + 1) : NAN;
+    } else if (strcmp(fn, "UPPER") == 0) {
+      char buf[MAXIN];
+      read_str_arg(p, buf, MAXIN);
+      for (int i = 0; buf[i]; i++) buf[i] = toupper(buf[i]);
+      strncpy(p->arg_str, buf, MAXIN - 1);
+      p->has_str_result = 1;
+      skipws(p);
+      if (*p->p != ')') return NAN;
+      p->p++;
+      return NAN;
+    } else if (strcmp(fn, "LOWER") == 0) {
+      char buf[MAXIN];
+      read_str_arg(p, buf, MAXIN);
+      for (int i = 0; buf[i]; i++) buf[i] = tolower(buf[i]);
+      strncpy(p->arg_str, buf, MAXIN - 1);
+      p->has_str_result = 1;
+      skipws(p);
+      if (*p->p != ')') return NAN;
+      p->p++;
+      return NAN;
+    } else if (strcmp(fn, "TRIM") == 0) {
+      char buf[MAXIN];
+      read_str_arg(p, buf, MAXIN);
+      // Trim leading and trailing whitespace
+      char* start = buf;
+      while (isspace(*start)) start++;
+      char* end = start + strlen(start);
+      while (end > start && isspace(*(end - 1))) end--;
+      *end = '\0';
+      strncpy(p->arg_str, start, MAXIN - 1);
+      p->has_str_result = 1;
+      skipws(p);
+      if (*p->p != ')') return NAN;
+      p->p++;
+      return NAN;
+    } else if (strcmp(fn, "LEFT") == 0) {
+      char buf[MAXIN];
+      read_str_arg(p, buf, MAXIN);
+      skipws(p);
+      int n = MAXIN;
+      if (*p->p == ',') {
+        p->p++;
+        skipws(p);
+        float nf = cmp(p);
+        n = (int)nf;
+      }
+      int slen = strlen(buf);
+      if (n < 0) n = 0;
+      if (n > slen) n = slen;
+      buf[n] = '\0';
+      strncpy(p->arg_str, buf, MAXIN - 1);
+      p->has_str_result = 1;
+      skipws(p);
+      if (*p->p != ')') return NAN;
+      p->p++;
+      return NAN;
+    } else if (strcmp(fn, "RIGHT") == 0) {
+      char buf[MAXIN];
+      read_str_arg(p, buf, MAXIN);
+      skipws(p);
+      int n = MAXIN;
+      if (*p->p == ',') {
+        p->p++;
+        skipws(p);
+        float nf = cmp(p);
+        n = (int)nf;
+      }
+      int slen = strlen(buf);
+      if (n < 0) n = 0;
+      if (n > slen) n = slen;
+      memmove(buf, buf + slen - n, n + 1);
+      strncpy(p->arg_str, buf, MAXIN - 1);
+      p->has_str_result = 1;
+      skipws(p);
+      if (*p->p != ')') return NAN;
+      p->p++;
+      return NAN;
+    } else if (strcmp(fn, "MID") == 0) {
+      char buf[MAXIN];
+      read_str_arg(p, buf, MAXIN);
+      skipws(p);
+      if (*p->p != ',') return NAN;
+      p->p++;
+      skipws(p);
+      float sf = cmp(p);
+      int start = (int)sf - 1;  // 1-indexed → 0-indexed
+      skipws(p);
+      int n = MAXIN;
+      if (*p->p == ',') {
+        p->p++;
+        skipws(p);
+        float nf = cmp(p);
+        n = (int)nf;
+      }
+      int slen = strlen(buf);
+      if (start < 0) start = 0;
+      if (start > slen) start = slen;
+      if (n < 0) n = 0;
+      if (start + n > slen) n = slen - start;
+      memmove(buf, buf + start, n);
+      buf[n] = '\0';
+      strncpy(p->arg_str, buf, MAXIN - 1);
+      p->has_str_result = 1;
+      skipws(p);
+      if (*p->p != ')') return NAN;
+      p->p++;
+      return NAN;
+    } else if (strcmp(fn, "CONCATENATE") == 0) {
+      char buf[MAXIN * 2] = {0};  // double buffer for concatenation
+      read_str_arg(p, buf, sizeof(buf));
+      for (;;) {
+        skipws(p);
+        if (*p->p != ',') break;
+        p->p++;
+        char next[MAXIN];
+        read_str_arg(p, next, MAXIN);
+        int blen = strlen(buf);
+        int nlen = strlen(next);
+        if (blen + nlen < (int)sizeof(buf) - 1)
+          memcpy(buf + blen, next, nlen + 1);
+      }
+      strncpy(p->arg_str, buf, MAXIN - 1);
+      p->has_str_result = 1;
+      skipws(p);
+      if (*p->p != ')') return NAN;
+      p->p++;
+      return NAN;
+
     } else {
       float arg = cmp(p);
 
@@ -434,6 +617,7 @@ float func(struct parser* p) {
   skipws(p);
   if (*p->p != ')') return NAN;
   p->p++;
+  p->has_str_result = 0;
   return result;
 }
 
@@ -461,6 +645,24 @@ float primary(struct parser* p) {
     p->p++;
     return v;
   }
+  if (*p->p == '"') {
+    // String literal
+    p->p++;
+    int i = 0;
+    while (*p->p && *p->p != '"' && i < MAXIN - 1) {
+      if (*p->p == '"' && *(p->p + 1) == '"') {
+        p->p++;
+        p->arg_str[i++] = '"';
+        p->p++;
+      } else {
+        p->arg_str[i++] = *p->p++;
+      }
+    }
+    p->arg_str[i] = '\0';
+    if (*p->p == '"') p->p++;
+    p->has_str_result = 1;
+    return NAN;
+  }
   if (isdigit(*p->p) || *p->p == '.') return number(p);
 
   // Google Sheets-style function call (no @ prefix): SUM(...)
@@ -468,7 +670,7 @@ float primary(struct parser* p) {
     const char* saved = p->p;
     float v = func(p);
     if (!isnan(v)) return v;
-    p->p = saved;
+    if (!p->has_str_result) p->p = saved;
   }
 
   return cellval(p);

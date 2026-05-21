@@ -1,16 +1,20 @@
 .TH KALK 1 "2026-03-15" "kalk" "User Commands"
 .SH NAME
-kalk \- a minimal terminal spreadsheet
+kalk \- a terminal spreadsheet with colors, formulas, and sorting
 .SH SYNOPSIS
 .B kalk
 .RI [ file.csv ]
 .SH DESCRIPTION
 .B kalk
 is a minimal VisiCalc-inspired spreadsheet for the terminal.
-It reads and writes CSV files and supports formulas, cell formatting,
-row/column operations, and title locking.
+It reads and writes CSV files and supports formulas with 30+ functions,
+cell colors (foreground and background), bold/italic text, conditional
+formatting, row/column operations, data sorting, cell replication with
+relative reference adjustment, and frozen title rows/columns.
+.PP
 Supports both traditional (@SUM(A1...A4)) and Google Sheets-style
-(=SUM(A1:A4)) formula syntax.
+(=SUM(A1:A4)) formula syntax. Multi-argument functions, SUMIF/COUNTIF
+with conditions, and VLOOKUP/HLOOKUP are also supported.
 .PP
 The grid supports columns A\-IV (256) and rows 1\-1024.
 .SH NAVIGATION
@@ -32,7 +36,7 @@ Go to a specific cell (type reference, e.g. B12)
 .SH ENTERING DATA
 .PP
 Type a number, formula, or label directly. Formulas start with
-.BR + ", " \- ", " ( ", " @ ", or " = .
+.BR + \fR, \fB \- \fR, \fB ( \fR, \fB @ \fR, or \fB = .
 Labels can be entered directly or prefixed with
 .BR \(dq .
 .TP
@@ -46,21 +50,78 @@ Force recalculation
 Formulas support arithmetic operators (+, \-, *, /), comparison operators
 (<, >, <=, >=, =, <>, !=), parentheses, cell references (e.g. A1, $B$2),
 and functions:
+.SS Range and aggregate functions
 .TP
-.B @SUM(range)
-Sum of values in range (e.g. @SUM(A1...A10) or =SUM(A1:A10))
+.B @SUM(range|args)
+Sum of values in range or comma-separated list (e.g. @SUM(A1...A10)
+or =SUM(A1, A2, A3))
 .TP
-.B @AVERAGE(range)
-Mean of values in range
+.B @AVERAGE(range|args)
+Mean of values in range or comma-separated list
 .TP
-.B @MIN(range)
-Minimum value in range
+.B @MIN(range|args)
+Minimum value in range or comma-separated list
 .TP
-.B @MAX(range)
-Maximum value in range
+.B @MAX(range|args)
+Maximum value in range or comma-separated list
 .TP
-.B @COUNT(range)
-Count of numeric cells in range
+.B @COUNT(range|args)
+Count of numeric cells in range or comma-separated list
+.SS Conditional functions
+.TP
+.B @SUMIF(range, condition, [sum_range])
+Sum cells in range matching condition. Optionally sum a different
+range: =SUMIF(A1:A10, ">5", B1:B10)
+.TP
+.B @COUNTIF(range, condition)
+Count cells in range matching condition. Conditions use the same
+operators as comparisons: >5, <0, >=10, <=3, =42, <>7, or plain 5
+.SS Lookup functions
+.TP
+.B @VLOOKUP(key, range, col_index, [is_sorted])
+Search first column of range for exact key match, return value from
+indexed column (1-based). Optional is_sorted argument is accepted but
+ignored (always exact match).
+.TP
+.B @HLOOKUP(key, range, row_index, [is_sorted])
+Search first row of range for exact key match, return value from
+indexed row (1-based).
+.SS Text functions
+.TP
+.B @LEN(expr)
+Length of a string (accepts cell ref, string literal, or expression)
+.TP
+.B @FIND(substring, str)
+Position of substring in str (1-indexed). Returns NAN if not found.
+.TP
+.B @LEFT(str, n)
+First n characters of str
+.TP
+.B @RIGHT(str, n)
+Last n characters of str
+.TP
+.B @MID(str, start, n)
+Substring starting at position (1-indexed), n characters long
+.TP
+.B @UPPER(str)
+Convert string to uppercase (returns string cell value)
+.TP
+.B @LOWER(str)
+Convert string to lowercase (returns string cell value)
+.TP
+.B @TRIM(str)
+Remove leading and trailing whitespace (returns string cell value)
+.TP
+.B @CONCATENATE(str1, str2, ...)
+Join strings together (returns string cell value)
+.PP
+String arguments can be cell references (A1), string literals (\(dq hello\(dq),
+or expressions. Functions that return strings (UPPER, LOWER, TRIM, LEFT,
+RIGHT, MID, CONCATENATE) produce a string cell value. Functions that accept
+strings (LEN, FIND) also accept numeric values (converted automatically).
+Text functions can be nested: LEN(UPPER(A1)) returns the length of the
+uppercased value of A1.
+.SS Math and utility functions
 .TP
 .B @IF(cond, tval, fval)
 If cond is non-zero and not NAN, returns tval, else fval
@@ -117,9 +178,9 @@ Tangent (radians)
 Natural logarithm
 .PP
 Functions can be used with or without the @ prefix (e.g. SUM(A1:A10)
-works the same as @SUM(A1:A10)). IF and ROUND/ROUNDUP/ROUNDDOWN
-accept comma-separated arguments (e.g. IF(A1, A2, A3)).
-Ranges can use either
+works the same as @SUM(A1:A10)). SUM/AVERAGE/MIN/MAX/COUNT accept both
+ranges (A1:A10) and comma-separated lists (A1, A2, A3). Ranges can use
+either
 .B ...
 (e.g. A1...A10) or
 .B :
@@ -154,7 +215,26 @@ Delete current row or column
 Insert row or column at cursor
 .TP
 .B /F \fIformat\fR
-Set cell format: L(eft) R(ight) I(nteger) G(eneral) D(efault) $(dollar) %(percent) *(bar graph)
+Set cell format: L(eft) R(ight) I(nteger) G(eneral) D(efault)
+$(dollar) %(percent) *(bar graph)
+.TP
+.B /F C
+Set foreground color (0=blk, 1=Red, 2=Grn, 3=Yel, 4=Blu, 5=Mag,
+6=Cyn, 7=Wht)
+.TP
+.B /F B
+Set background color (same palette as foreground)
+.TP
+.B /F O
+Set text attribute (0=none, 1=Bold, 2=Italic, 3=Both)
+.TP
+.B /F N
+Set conditional format rule (e.g. >5, <0, =10, <>7). Enter=clear.
+The cell is colored with its assigned color only when the rule matches.
+.TP
+.B /F X
+Clear all cell formatting: foreground/background color, text attribute,
+and conditional format rule
 .TP
 .B /GC
 Set global column width (4\-20)
@@ -163,10 +243,16 @@ Set global column width (4\-20)
 Set global default format
 .TP
 .B /M
-Move row or column (use arrow keys to drag, Enter to confirm, Esc to cancel)
+Move row or column (use arrow keys to drag, Enter to confirm,
+Esc to cancel)
+.TP
+.B /O
+Sort rows ascending by column. Type a column letter (e.g. A, B, AA).
+Labels and empty cells sink to bottom.
 .TP
 .B /R
-Replicate (copy) cells. Select source range, then target location. Formulas
+Replicate (copy) cells. Select source range (arrow keys or type ref,
+Enter to confirm, Esc to cancel), then pick target location. Formulas
 adjust relative references automatically.
 .TP
 .B /SL
@@ -179,7 +265,8 @@ Save CSV file
 Save and quit
 .TP
 .B /TV\fR,\fB /TH\fR,\fB /TB\fR,\fB /TN
-Lock title rows/columns: Vertical, Horizontal, Both, or None
+Lock title rows/columns: Vertical (freeze columns left of cursor),
+Horizontal (freeze rows above cursor), Both, or None
 .TP
 .B /Q
 Quit (prompts if unsaved changes)
