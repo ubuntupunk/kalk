@@ -31,9 +31,9 @@ Progress tracking for making kalk more like Google Sheets.
 
 ### Phase 4: Data operations
 
-- [ ] **Data sorting** — `/S` command to sort rows by a column
+- [x] **Data sorting** — `/O` command to sort rows by a column
 - [ ] **Auto-fill** — replicate patterns (1, 2, 3... or Mon, Tue, Wed...) via `/R`
-- [ ] **Conditional formatting** — color cells based on values
+- [x] **Cell colors** — `/F` C set cell color (0-7), `/F` N set conditional formatting rule
 
 ### Phase 5: Polish & UX
 

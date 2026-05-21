@@ -52,7 +52,7 @@ static float cellval(struct parser* p) {
 
 // Parse condition string like ">5", ">=10", "<0", "<=100", "=42", "<>7", "5"
 // Returns op: 0=EQ, 1=GT, 2=LT, 3=GE, 4=LE, 5=NE and the numeric value.
-static int parse_cond(const char* s, int* op, float* val) {
+int parse_cond(const char* s, int* op, float* val) {
   while (isspace(*s)) s++;
   *op = 0; // default: equals
   if (*s == '>') { *op = 1; s++; if (*s == '=') { *op = 3; s++; } }

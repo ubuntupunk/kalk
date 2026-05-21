@@ -190,6 +190,23 @@ void swapcol(struct grid* g, int a, int b) {
   fixrefs(g, 'C', a, b);
 }
 
+void sortbycol(struct grid* g, int col) {
+  // Bubble sort: put EMPTY/LABEL cells at bottom, sort NUM/FORMULA by value ascending
+  for (int i = 0; i < NROW - 1; i++) {
+    for (int j = 0; j < NROW - 1 - i; j++) {
+      struct cell* a = &g->cells[col][j];
+      struct cell* b = &g->cells[col][j + 1];
+      int a_empty = (a->type == EMPTY || a->type == LABEL);
+      int b_empty = (b->type == EMPTY || b->type == LABEL);
+      if (a_empty && !b_empty) {
+        swaprow(g, j, j + 1);
+      } else if (!a_empty && !b_empty && a->val > b->val) {
+        swaprow(g, j, j + 1);
+      }
+    }
+  }
+}
+
 void replicatecell(struct grid* g, int sc, int sr, int dc, int dr) {
   struct cell* src = cell(g, sc, sr);
   struct cell* dst = cell(g, dc, dr);

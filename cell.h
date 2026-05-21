@@ -14,6 +14,8 @@ struct cell {
   float val;
   char text[MAXIN];  // raw user input
   int fmt;  // 0=general 'I'=integer 'D'=default '$'=dollar '%'=percent '*'=graph 'L'=left 'R'=right
+  int color;  // 0=default, 1-7=ncurses color pair index
+  char cond[64];  // conditional format rule e.g. ">5", "=0" (empty = none)
 };
 
 struct grid {
@@ -43,6 +45,9 @@ void swapcol(struct grid* g, int a, int b);
 // Cell replication
 void replicatecell(struct grid* g, int sc, int sr, int dc, int dr);
 
+// Sorting
+void sortbycol(struct grid* g, int col);
+
 // Column name utility
 char* col(int c);
 
@@ -51,6 +56,7 @@ float expr(struct parser* p);
 float cmp(struct parser* p);
 int ref(const char* s, int* col, int* row);
 int refabs(const char* s, int* col, int* row, int* absc, int* absr);
+int parse_cond(const char* s, int* op, float* val);
 
 // CSV I/O
 int csvload(struct grid* g, const char* filename);

@@ -784,6 +784,91 @@ void test_replicate(void) {
   assert(g.cells[1][3].val == 2.0f);  // tiled
 }
 
+void test_sort(void) {
+  static struct grid g = {0};
+
+  // Setup: A1=50, A2=10, A3=30, A4=20
+  setcell(&g, 0, 0, "50");
+  setcell(&g, 0, 1, "10");
+  setcell(&g, 0, 2, "30");
+  setcell(&g, 0, 3, "20");
+
+  // Sort column A ascending
+  sortbycol(&g, 0);
+  recalc(&g);
+
+  assert(g.cells[0][0].val == 10.0f);
+  assert(g.cells[0][1].val == 20.0f);
+  assert(g.cells[0][2].val == 30.0f);
+  assert(g.cells[0][3].val == 50.0f);
+}
+
+void test_sort_labels_sink(void) {
+  static struct grid g = {0};
+
+  // A1="hello" (LABEL), A2=42 (NUM), A3=10 (NUM)
+  setcell(&g, 0, 0, "hello");
+  setcell(&g, 0, 1, "42");
+  setcell(&g, 0, 2, "10");
+
+  sortbycol(&g, 0);
+  recalc(&g);
+
+  // Labels sink to bottom, NUM sorted ascending
+  assert(g.cells[0][0].type == NUM);
+  assert(g.cells[0][0].val == 10.0f);
+  assert(g.cells[0][1].type == NUM);
+  assert(g.cells[0][1].val == 42.0f);
+  assert(g.cells[0][2].type == LABEL);  // hello sank to bottom
+}
+
+void test_sort_with_refs(void) {
+  static struct grid g = {0};
+
+  // A1=30, A2=10, B1=+A1, B2=+A2  (B1=30, B2=10)
+  setcell(&g, 0, 0, "30");
+  setcell(&g, 0, 1, "10");
+  setcell(&g, 1, 0, "+A1");
+  setcell(&g, 1, 1, "+A2");
+
+  sortbycol(&g, 0);
+  recalc(&g);
+
+  // After sort: A1=10, A2=30  → refs updated: B1=+A1=10, B2=+A2=30
+  assert(g.cells[0][0].val == 10.0f);
+  assert(g.cells[0][1].val == 30.0f);
+  // Formulas moved with their rows
+  assert(g.cells[1][0].val == 10.0f);  // was B2=+A2, now B1, ref A1=10
+  assert(g.cells[1][1].val == 30.0f);  // was B1=+A1, now B2, ref A2=30
+}
+
+void test_color_cond_fields(void) {
+  static struct grid g = {0};
+
+  // Verify color and cond fields exist and can be set
+  struct cell* cl = &g.cells[0][0];
+  cl->color = 0;
+  cl->cond[0] = '\0';
+  assert(cl->color == 0);
+  assert(cl->cond[0] == '\0');
+
+  cl->color = 2;
+  assert(cl->color == 2);
+
+  strcpy(cl->cond, ">5");
+  assert(strcmp(cl->cond, ">5") == 0);
+
+  // parse_cond works on cond field
+  int op; float val;
+  assert(parse_cond(cl->cond, &op, &val) == 1);
+  assert(op == 1);  // GT
+  assert(val == 5.0f);
+
+  // Empty cond parses as "=0" — actually parse_cond returns 0 for empty string
+  cl->cond[0] = '\0';
+  assert(parse_cond(cl->cond, &op, &val) == 0);
+}
+
 int main(void) {
   test_expr();
   test_recalc();
@@ -796,5 +881,9 @@ int main(void) {
   test_fixrefs();
   test_insert_delete();
   test_replicate();
+  test_sort();
+  test_sort_labels_sink();
+  test_sort_with_refs();
+  test_color_cond_fields();
   return 0;
 }

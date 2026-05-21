@@ -106,11 +106,36 @@ static void draw(struct grid* g, const char* mode, const char* buf) {
 
       int is_cur = (c == g->cc && row == g->cr);
       int is_locked = (is_locked_row || is_locked_col);
+
+      // Apply cell color (skip for cursor cell to keep selection visible)
+      int cell_color = 0;
+      if (cl && !is_cur) {
+        if (cl->cond[0] && cl->type != EMPTY && cl->type != LABEL && cl->color > 0) {
+          int cop; float cv;
+          if (parse_cond(cl->cond, &cop, &cv)) {
+            int match = 0;
+            switch (cop) {
+              case 1: match = (cl->val > cv); break;
+              case 2: match = (cl->val < cv); break;
+              case 3: match = (cl->val >= cv); break;
+              case 4: match = (cl->val <= cv); break;
+              case 5: match = (cl->val != cv); break;
+              default: match = (cl->val == cv); break;
+            }
+            if (match) cell_color = cl->color;
+          }
+        } else if (cl->color > 0) {
+          cell_color = cl->color;
+        }
+      }
+      if (cell_color) attron(COLOR_PAIR(cell_color));
+
       if (is_cur || is_locked) attron(A_REVERSE);
       if (is_locked && !is_cur) attron(A_BOLD);
       mvprintw(y, GW + ci * CW, "%s", fb);
       if (is_locked && !is_cur) attroff(A_BOLD);
       if (is_cur || is_locked) attroff(A_REVERSE);
+      if (cell_color) attroff(COLOR_PAIR(cell_color));
     }
   }
 }
@@ -366,11 +391,35 @@ int command(struct grid* g) {
     else if (ch == 'C')
       insertcol(g, g->cc);
     recalc(g);
-  } else if (ch == 'F') {  // change cell format
-    mvprintw(1, 0, "Format: L R I G D $ %% *"), clrtoeol();
+  } else if (ch == 'F') {  // change cell format/color/condition
+    mvprintw(1, 0, "Fmt: L R I G D $ %% * | (C)olor | (N)cond"), clrtoeol();
     ch = toupper(getch());
     struct cell* cl = cell(g, g->cc, g->cr);
     if (strchr("LRIGD$%*", ch)) cl->fmt = ch;
+    else if (ch == 'C') {
+      mvprintw(1, 0, "Color: 0=none 1=Red 2=Green 3=Yel 4=Blue 5=Mag 6=Cyan 7=Wht"), clrtoeol();
+      ch = toupper(getch());
+      int col = ch - '0';
+      if (col >= 0 && col <= 7) cl->color = col;
+    } else if (ch == 'N') {
+      mvprintw(1, 0, "Cond (>5, <0, =10, <>7), Enter=none: "), clrtoeol();
+      char cbuf[64] = {0};
+      int cn = 0;
+      for (;;) {
+        mvprintw(1, 30, "%s_", cbuf);
+        int k = getch();
+        if (k == 27) break;
+        if (k == 10 || k == 13 || k == KEY_ENTER) {
+          strncpy(cl->cond, cbuf, sizeof(cl->cond) - 1);
+          break;
+        } else if (k == KEY_BACKSPACE || k == 127 || k == 8) {
+          if (cn > 0) cbuf[--cn] = '\0';
+        } else if (cn < (int)sizeof(cbuf) - 2 && k >= 32) {
+          cbuf[cn++] = k;
+          cbuf[cn] = '\0';
+        }
+      }
+    }
   } else if (ch == 'G') {  // change global settings
     mvprintw(1, 0, "Global: (C)ol width or (F)mt?"), clrtoeol();
     ch = toupper(getch());
@@ -418,6 +467,32 @@ int command(struct grid* g) {
     } else if (ch == 'N') {
       g->tc = g->tr = 0;
       g->vc = g->vr = 0;
+    }
+  } else if (ch == 'O') {  // sort rows by column
+    mvprintw(1, 0, "Sort by column (e.g. A, B, AA): "), clrtoeol();
+    char sbuf[16] = {0};
+    int sn = 0;
+    for (;;) {
+      mvprintw(1, 25, "%s_", sbuf);
+      int k = getch();
+      if (k == 27) break;
+      if (k == 10 || k == 13 || k == KEY_ENTER) {
+        // Append row number to make valid cell ref (user types "A", we use "A1")
+        char refbuf[20];
+        snprintf(refbuf, sizeof(refbuf), "%s1", sbuf);
+        int c, r;
+        if (ref(refbuf, &c, &r) && c >= 0 && c < NCOL) {
+          sortbycol(g, c);
+          recalc(g);
+          g->dirty = 1;
+        }
+        break;
+      } else if (k == KEY_BACKSPACE || k == 127 || k == 8) {
+        if (sn > 0) sbuf[--sn] = '\0';
+      } else if (isalpha(k) && sn < (int)sizeof(sbuf) - 2) {
+        sbuf[sn++] = toupper(k);
+        sbuf[sn] = '\0';
+      }
     }
   } else if (ch == 'S') {
     mvprintw(1, 0, "Storage: (L)oad, (S)ave, or save & (Q)uit?"), clrtoeol();
