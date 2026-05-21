@@ -49,6 +49,18 @@ references (e.g. A1, $B$2), and functions:
 .B @SUM(range)
 Sum of values in range (e.g. @SUM(A1...A10) or =SUM(A1:A10))
 .TP
+.B @AVERAGE(range)
+Mean of values in range
+.TP
+.B @MIN(range)
+Minimum value in range
+.TP
+.B @MAX(range)
+Maximum value in range
+.TP
+.B @COUNT(range)
+Count of numeric cells in range
+.TP
 .B @ABS(expr)
 Absolute value
 .TP
@@ -57,6 +69,21 @@ Integer part (truncate)
 .TP
 .B @SQRT(expr)
 Square root
+.TP
+.B @ROUND(expr, places)
+Round to N decimal places (default 0)
+.TP
+.B @ROUNDUP(expr, places)
+Round up to N decimal places (default 0)
+.TP
+.B @ROUNDDOWN(expr, places)
+Round down to N decimal places (default 0)
+.TP
+.B @CEILING(expr)
+Round up to nearest integer
+.TP
+.B @FLOOR(expr)
+Round down to nearest integer
 .PP
 Functions can be used with or without the @ prefix (e.g. SUM(A1:A10)
 works the same as @SUM(A1:A10)). Ranges can use either

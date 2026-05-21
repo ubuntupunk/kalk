@@ -68,6 +68,24 @@ Functions can also be used without `@` or `=`: `SUM(A1:A10)`.
 
 The two syntaxes are fully compatible and can be mixed.
 
+### Functions
+
+| Function | Description | Example |
+|---|---|---|
+| `SUM` | Sum of values in range | `=SUM(A1:A10)` |
+| `AVERAGE` | Mean of values | `=AVERAGE(A1:A10)` |
+| `MIN` | Minimum value | `=MIN(A1:A10)` |
+| `MAX` | Maximum value | `=MAX(A1:A10)` |
+| `COUNT` | Count of numeric cells | `=COUNT(A1:A10)` |
+| `ABS` | Absolute value | `=ABS(A1)` |
+| `INT` | Integer truncation | `=INT(A1)` |
+| `SQRT` | Square root | `=SQRT(A1)` |
+| `ROUND` | Round to N decimal places | `=ROUND(A1, 2)` |
+| `ROUNDUP` | Round up (ceiling) | `=ROUNDUP(A1, 2)` |
+| `ROUNDDOWN` | Round down (floor) | `=ROUNDDOWN(A1, 2)` |
+| `CEILING` | Round up to integer | `=CEILING(A1)` |
+| `FLOOR` | Round down to integer | `=FLOOR(A1)` |
+
 Cell references adjust automatically on replicate, insert, and delete.
 Use `$` for absolute references: `$A$1` (fixed), `$A1` (fixed column),
 `A$1` (fixed row).
