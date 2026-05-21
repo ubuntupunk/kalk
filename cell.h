@@ -16,6 +16,7 @@ struct cell {
   int fmt;  // 0=general 'I'=integer 'D'=default '$'=dollar '%'=percent '*'=graph 'L'=left 'R'=right
   int color;  // 0=default, 1-7=foreground color
   int bg;      // 0=default, 1-7=background color
+  int attr;    // 0=normal 1=A_BOLD 2=A_ITALIC 3=A_BOLD|A_ITALIC
   char cond[64];  // conditional format rule e.g. ">5", "=0" (empty = none)
 };
 

@@ -878,6 +878,16 @@ void test_color_cond_fields(void) {
   cl->bg = 4;
   assert(cl->color == 1);
   assert(cl->bg == 4);
+
+  // attr field
+  cl->attr = 0;
+  assert(cl->attr == 0);
+  cl->attr = 1;
+  assert(cl->attr == 1);
+  cl->attr = 2;
+  assert(cl->attr == 2);
+  cl->attr = 3;
+  assert(cl->attr == 3);
 }
 
 int main(void) {

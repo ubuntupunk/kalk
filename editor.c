@@ -129,6 +129,14 @@ static void draw(struct grid* g, const char* mode, const char* buf) {
           pair_id = fg * 8 + bg;
         }
       }
+
+      // Cell text attributes (bold/italic)
+      int cell_attr = 0;
+      if (cl && cl->attr) {
+        if (cl->attr & 1) cell_attr |= A_BOLD;
+        if (cl->attr & 2) cell_attr |= A_ITALIC;
+      }
+      if (cell_attr) attron(cell_attr);
       if (pair_id) attron(COLOR_PAIR(pair_id));
 
       if (is_cur || is_locked) attron(A_REVERSE);
@@ -137,6 +145,7 @@ static void draw(struct grid* g, const char* mode, const char* buf) {
       if (is_locked && !is_cur) attroff(A_BOLD);
       if (is_cur || is_locked) attroff(A_REVERSE);
       if (pair_id) attroff(COLOR_PAIR(pair_id));
+      if (cell_attr) attroff(cell_attr);
     }
   }
 }
@@ -393,7 +402,7 @@ int command(struct grid* g) {
       insertcol(g, g->cc);
     recalc(g);
   } else if (ch == 'F') {  // change cell format/color/condition
-    mvprintw(1, 0, "Fmt: L R I G D $ %% * | Fg(C) | (B)g | (N)cond"), clrtoeol();
+    mvprintw(1, 0, "Fmt: L R I G D $ %% * | Fg(C) | (B)g | Attr(O) | (N)cond | (X)clear"), clrtoeol();
     ch = toupper(getch());
     struct cell* cl = cell(g, g->cc, g->cr);
     if (strchr("LRIGD$%*", ch)) cl->fmt = ch;
@@ -407,6 +416,18 @@ int command(struct grid* g) {
       ch = toupper(getch());
       int col = ch - '0';
       if (col >= 0 && col <= 7) cl->bg = col;
+      g->dirty = 1;
+    } else if (ch == 'O') {
+      mvprintw(1, 0, "Attr: 0=none 1=Bold 2=Italic 3=Both"), clrtoeol();
+      ch = getch();
+      int a = ch - '0';
+      if (a >= 0 && a <= 3) cl->attr = a;
+      g->dirty = 1;
+    } else if (ch == 'X') {
+      cl->color = 0;
+      cl->bg = 0;
+      cl->attr = 0;
+      cl->cond[0] = '\0';
       g->dirty = 1;
     } else if (ch == 'N') {
       mvprintw(1, 0, "Cond (>5, <0, =10, <>7), Enter=none: "), clrtoeol();
