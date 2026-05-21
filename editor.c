@@ -107,10 +107,11 @@ static void draw(struct grid* g, const char* mode, const char* buf) {
       int is_cur = (c == g->cc && row == g->cr);
       int is_locked = (is_locked_row || is_locked_col);
 
-      // Apply cell color (skip for cursor cell to keep selection visible)
-      int cell_color = 0;
+      // Apply cell foreground+background color (skip for cursor cell to keep selection visible)
+      int pair_id = 0;
       if (cl && !is_cur) {
-        if (cl->cond[0] && cl->type != EMPTY && cl->type != LABEL && cl->color > 0) {
+        int fg = cl->color, bg = cl->bg;
+        if (cl->cond[0] && cl->type != EMPTY && cl->type != LABEL && (fg > 0 || bg > 0)) {
           int cop; float cv;
           if (parse_cond(cl->cond, &cop, &cv)) {
             int match = 0;
@@ -122,20 +123,20 @@ static void draw(struct grid* g, const char* mode, const char* buf) {
               case 5: match = (cl->val != cv); break;
               default: match = (cl->val == cv); break;
             }
-            if (match) cell_color = cl->color;
+            if (match) pair_id = fg * 8 + bg;
           }
-        } else if (cl->color > 0) {
-          cell_color = cl->color;
+        } else if (fg > 0 || bg > 0) {
+          pair_id = fg * 8 + bg;
         }
       }
-      if (cell_color) attron(COLOR_PAIR(cell_color));
+      if (pair_id) attron(COLOR_PAIR(pair_id));
 
       if (is_cur || is_locked) attron(A_REVERSE);
       if (is_locked && !is_cur) attron(A_BOLD);
       mvprintw(y, GW + ci * CW, "%s", fb);
       if (is_locked && !is_cur) attroff(A_BOLD);
       if (is_cur || is_locked) attroff(A_REVERSE);
-      if (cell_color) attroff(COLOR_PAIR(cell_color));
+      if (pair_id) attroff(COLOR_PAIR(pair_id));
     }
   }
 }
@@ -392,15 +393,21 @@ int command(struct grid* g) {
       insertcol(g, g->cc);
     recalc(g);
   } else if (ch == 'F') {  // change cell format/color/condition
-    mvprintw(1, 0, "Fmt: L R I G D $ %% * | (C)olor | (N)cond"), clrtoeol();
+    mvprintw(1, 0, "Fmt: L R I G D $ %% * | Fg(C) | (B)g | (N)cond"), clrtoeol();
     ch = toupper(getch());
     struct cell* cl = cell(g, g->cc, g->cr);
     if (strchr("LRIGD$%*", ch)) cl->fmt = ch;
     else if (ch == 'C') {
-      mvprintw(1, 0, "Color: 0=none 1=Red 2=Green 3=Yel 4=Blue 5=Mag 6=Cyan 7=Wht"), clrtoeol();
+      mvprintw(1, 0, "Fg: 0=blk 1=Red 2=Grn 3=Yel 4=Blu 5=Mag 6=Cyn 7=Wht"), clrtoeol();
       ch = toupper(getch());
       int col = ch - '0';
       if (col >= 0 && col <= 7) cl->color = col;
+    } else if (ch == 'B') {
+      mvprintw(1, 0, "Bg: 0=blk 1=Red 2=Grn 3=Yel 4=Blu 5=Mag 6=Cyn 7=Wht"), clrtoeol();
+      ch = toupper(getch());
+      int col = ch - '0';
+      if (col >= 0 && col <= 7) cl->bg = col;
+      g->dirty = 1;
     } else if (ch == 'N') {
       mvprintw(1, 0, "Cond (>5, <0, =10, <>7), Enter=none: "), clrtoeol();
       char cbuf[64] = {0};

@@ -25,13 +25,12 @@ int main(int argc, char* argv[]) {
   curs_set(0);
   if (has_colors()) {
     start_color();
-    init_pair(1, COLOR_RED, COLOR_BLACK);
-    init_pair(2, COLOR_GREEN, COLOR_BLACK);
-    init_pair(3, COLOR_YELLOW, COLOR_BLACK);
-    init_pair(4, COLOR_BLUE, COLOR_BLACK);
-    init_pair(5, COLOR_MAGENTA, COLOR_BLACK);
-    init_pair(6, COLOR_CYAN, COLOR_BLACK);
-    init_pair(7, COLOR_WHITE, COLOR_BLACK);
+    static const int cmap[] = {COLOR_BLACK, COLOR_RED, COLOR_GREEN, COLOR_YELLOW,
+                               COLOR_BLUE, COLOR_MAGENTA, COLOR_CYAN, COLOR_WHITE};
+    for (int fg = 0; fg < 8; fg++)
+      for (int bg = 0; bg < 8; bg++)
+        if (fg > 0 || bg > 0)  // skip pair 0 (unused default)
+          init_pair(fg * 8 + bg, cmap[fg], cmap[bg]);
   }
   loop(&g);
   endwin();

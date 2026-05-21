@@ -14,7 +14,8 @@ struct cell {
   float val;
   char text[MAXIN];  // raw user input
   int fmt;  // 0=general 'I'=integer 'D'=default '$'=dollar '%'=percent '*'=graph 'L'=left 'R'=right
-  int color;  // 0=default, 1-7=ncurses color pair index
+  int color;  // 0=default, 1-7=foreground color
+  int bg;      // 0=default, 1-7=background color
   char cond[64];  // conditional format rule e.g. ">5", "=0" (empty = none)
 };
 

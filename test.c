@@ -867,6 +867,17 @@ void test_color_cond_fields(void) {
   // Empty cond parses as "=0" — actually parse_cond returns 0 for empty string
   cl->cond[0] = '\0';
   assert(parse_cond(cl->cond, &op, &val) == 0);
+
+  // bg field
+  cl->bg = 0;
+  assert(cl->bg == 0);
+  cl->bg = 3;
+  assert(cl->bg == 3);
+  // fg and bg independently settable
+  cl->color = 1;
+  cl->bg = 4;
+  assert(cl->color == 1);
+  assert(cl->bg == 4);
 }
 
 int main(void) {
