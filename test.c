@@ -17,7 +17,7 @@ void test_expr(void) {
   g.cells[0][2].val = 11.0f;
   g.cells[0][3].type = NUM;
   g.cells[0][3].val = -13.5f;
-#define EXPR(e) (p.s = p.p = e, p.g = &g, expr(&p))
+#define EXPR(e) (p.s = p.p = e, p.g = &g, cmp(&p))
   // numbers
   assert(isnan(EXPR("")));
   assert(EXPR("42") == 42.0f);
@@ -90,6 +90,39 @@ void test_expr(void) {
   assert(EXPR("ROUND(1.5, 0))") == 2.0f);
   assert(EXPR("CEILING(-3.5))") == -3.0f);
   assert(EXPR("FLOOR(-3.5))") == -4.0f);
+  // Comparison operators
+  assert(EXPR("A1>0") == 1.0f);   // 3>0 → true
+  assert(EXPR("A1>5") == 0.0f);   // 3>5 → false
+  assert(EXPR("A1<5") == 1.0f);   // 3<5 → true
+  assert(EXPR("A1<0") == 0.0f);   // 3<0 → false
+  assert(EXPR("A1=3") == 1.0f);   // 3==3 → true
+  assert(EXPR("A1=5") == 0.0f);   // 3==5 → false
+  assert(EXPR("A1<>3") == 0.0f);  // 3≠3 → false
+  assert(EXPR("A1<>5") == 1.0f);  // 3≠5 → true
+  assert(EXPR("A1!=5") == 1.0f);  // 3≠5 → true (!= variant)
+  assert(EXPR("A1<=3") == 1.0f);  // 3≤3 → true
+  assert(EXPR("A1<=2") == 0.0f);  // 3≤2 → false
+  assert(EXPR("A1>=3") == 1.0f);  // 3≥3 → true
+  assert(EXPR("A1>=5") == 0.0f);  // 3≥5 → false
+  // Comparison with arithmetic (comparison has lower precedence)
+  assert(EXPR("A1+A2<10") == 1.0f);  // 3+5=8, 8<10 → true
+  assert(EXPR("A1*A2>10") == 1.0f);  // 3*5=15, 15>10 → true
+  assert(EXPR("(A1+A2)>A3") == 0.0f); // (3+5)=8>11 → false
+  assert(EXPR("(A1+A2)=A3") == 0.0f); // 8=11 → false
+  assert(EXPR("(A1+A2)=8") == 1.0f);  // 8=8 → true
+  // Chained: left-to-right
+  assert(EXPR("3>2>1") == 0.0f);  // (3>2)=1, 1>1=0
+  // IF with comparisons
+  assert(EXPR("IF(A1>0, 10, 20))") == 10.0f);   // 3>0 → true → 10
+  assert(EXPR("IF(A1>5, 10, 20))") == 20.0f);   // 3>5 → false → 20
+  assert(EXPR("IF(A1=3, A2, A3))") == 5.0f);    // 3=3 → true → A2=5
+  assert(EXPR("IF(A1<>5, A2, A3))") == 5.0f);   // 3≠5 → true → A2=5
+  assert(EXPR("IF(A1<>3, A2, A3))") == 11.0f);  // 3≠3 → false → A3=11
+  assert(EXPR("IF(A1+A2>10, A3, A4))") == -13.5f); // 3+5=8>10 → false → A4=-13.5
+  assert(EXPR("IF(A1*A2>10, A3, A4))") == 11.0f);  // 3*5=15>10 → true → A3=11
+  // Nested IF with comparisons
+  assert(EXPR("IF(A1>0, IF(A2<10, 100, 200), 300))") == 100.0f);
+  assert(EXPR("IF(A1>5, 10, IF(A2<10, 20, 30)))") == 20.0f);
   // IF function
   assert(EXPR("IF(1, 10, 20))") == 10.0f);
   assert(EXPR("IF(0, 10, 20))") == 20.0f);

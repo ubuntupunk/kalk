@@ -48,6 +48,7 @@ char* col(int c);
 
 // Formula parser
 float expr(struct parser* p);
+float cmp(struct parser* p);
 int ref(const char* s, int* col, int* row);
 int refabs(const char* s, int* col, int* row, int* absc, int* absr);
 

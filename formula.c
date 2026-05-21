@@ -50,6 +50,36 @@ static float cellval(struct parser* p) {
   return cl->val;
 }
 
+// Comparison operators: < > <= >= = <> !=
+// Lower precedence than + and -, so A1+5>B2 parses as (A1+5)>B2
+float cmp(struct parser* p) {
+  float l = expr(p);
+  for (;;) {
+    skipws(p);
+    if (*p->p == '<') {
+      p->p++;
+      if (*p->p == '=') { p->p++; float r = expr(p); l = (l <= r) ? 1.0f : 0.0f; }
+      else if (*p->p == '>') { p->p++; float r = expr(p); l = (l != r) ? 1.0f : 0.0f; }
+      else { float r = expr(p); l = (l < r) ? 1.0f : 0.0f; }
+    } else if (*p->p == '>') {
+      p->p++;
+      if (*p->p == '=') { p->p++; float r = expr(p); l = (l >= r) ? 1.0f : 0.0f; }
+      else { float r = expr(p); l = (l > r) ? 1.0f : 0.0f; }
+    } else if (*p->p == '=') {
+      p->p++;
+      float r = expr(p);
+      l = (l == r) ? 1.0f : 0.0f;
+    } else if (*p->p == '!' && *(p->p + 1) == '=') {
+      p->p += 2;
+      float r = expr(p);
+      l = (l != r) ? 1.0f : 0.0f;
+    } else {
+      break;
+    }
+  }
+  return l;
+}
+
 float func(struct parser* p) {
   char fn[16] = {0};
   for (int i = 0; isalpha(*p->p) && i < sizeof(fn) - 1;) fn[i++] = toupper(*p->p++);
@@ -106,20 +136,20 @@ float func(struct parser* p) {
   } else if (!is_range) {
     // IF(condition, true_val, false_val) — three comma-separated arguments
     if (strcmp(fn, "IF") == 0) {
-      float cond = expr(p);
+      float cond = cmp(p);
       skipws(p);
       if (*p->p != ',') return NAN;
       p->p++;
       skipws(p);
-      float tval = expr(p);
+      float tval = cmp(p);
       skipws(p);
       if (*p->p != ',') return NAN;
       p->p++;
       skipws(p);
-      float fval = expr(p);
+      float fval = cmp(p);
       result = (cond != 0.0f && !isnan(cond)) ? tval : fval;
     } else {
-      float arg = expr(p);
+      float arg = cmp(p);
       // Optional second argument for ROUND/ROUNDUP/ROUNDDOWN
       float arg2 = 0;
       int has_arg2 = 0;
@@ -129,7 +159,7 @@ float func(struct parser* p) {
         if (*p->p == ',') {
           p->p++;
           skipws(p);
-          arg2 = expr(p);
+          arg2 = cmp(p);
           has_arg2 = 1;
         }
       }
@@ -192,11 +222,11 @@ float primary(struct parser* p) {
   }
   if (*p->p == '=') {
     p->p++;
-    return expr(p);
+    return cmp(p);
   }
   if (*p->p == '(') {
     p->p++;
-    float v = expr(p);
+    float v = cmp(p);
     skipws(p);
     if (*p->p != ')') return NAN;
     p->p++;

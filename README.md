@@ -94,7 +94,23 @@ The two syntaxes are fully compatible and can be mixed.
 | `ROUNDDOWN` | Round down | `=ROUNDDOWN(A1, 2)` |
 | `CEILING` | Round up to integer | `=CEILING(A1)` |
 | `FLOOR` | Round down to integer | `=FLOOR(A1)` |
-| `IF` | Conditional: if cond is truthy, return a else b | `=IF(A1, A2, A3)` |
+| `IF` | Conditional: if cond is truthy, return a else b | `=IF(A1>5, A2, A3)` |
+
+### Comparison operators
+
+Comparisons return 1 (true) or 0 (false):
+
+| Operator | Meaning | Example |
+|---|---|---|
+| `<` | Less than | `=A1<5` |
+| `>` | Greater than | `=A1>5` |
+| `<=` | Less than or equal | `=A1<=5` |
+| `>=` | Greater than or equal | `=A1>=5` |
+| `=` | Equal to | `=A1=3` |
+| `<>` | Not equal to | `=A1<>5` |
+| `!=` | Not equal to (alt.) | `A1!=5` |
+
+Comparisons have lower precedence than arithmetic, so `A1+B2>10` parses as `(A1+B2)>10`.
 
 Cell references adjust automatically on replicate, insert, and delete.
 Use `$` for absolute references: `$A$1` (fixed), `$A1` (fixed column),

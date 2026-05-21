@@ -19,7 +19,7 @@ void recalc(struct grid* g) {
         struct cell* cl = &g->cells[c][r];
         if (cl->type != FORMULA) continue;
         struct parser p = {cl->text, cl->text, g};
-        float v = expr(&p);
+        float v = cmp(&p);
         if (v != cl->val) changed = 1;
         cl->val = v;
       }
