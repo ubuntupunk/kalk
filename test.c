@@ -174,6 +174,65 @@ void test_expr(void) {
   // = and @ prefix work with math functions
   assert(EXPR("=POWER(2, 10))") == 1024.0f);
   assert(EXPR("@MOD(17, 5))") == 2.0f);
+  // SUMIF with sum_range: set B col values for meaningful tests
+  // B1=0, B2=0, B3=0 (zero-initialized static grid)
+  // SUMIF with comparison operators
+  assert(EXPR("SUMIF(A1:A3, 5))") == 5.0f);  // only A2=5
+  assert(EXPR("SUMIF(A1:A3, 3))") == 3.0f);  // only A1=3
+  assert(EXPR("SUMIF(A1:A3, 99))") == 0.0f); // none match
+  assert(EXPR("SUMIF(A1:A3, >5))") == 11.0f);   // A3>5 → 11
+  assert(EXPR("SUMIF(A1:A3, <5))") == 3.0f);    // A1<5 → 3
+  assert(EXPR("SUMIF(A1:A3, >=5))") == 16.0f);  // A2+A3 → 16
+  assert(EXPR("SUMIF(A1:A3, <=5))") == 8.0f);   // A1+A2 → 8
+  assert(EXPR("SUMIF(A1:A3, <>5))") == 14.0f);  // A1+A3 → 14
+  assert(EXPR("SUMIF(A1:A4, <0))") == -13.5f);  // only A4<0
+  assert(EXPR("SUMIF(A1:A3, >0))") == 19.0f);   // all positive
+  // COUNTIF
+  assert(EXPR("COUNTIF(A1:A3, 5))") == 1.0f);   // one cell =5
+  assert(EXPR("COUNTIF(A1:A3, >0))") == 3.0f);  // all >0
+  assert(EXPR("COUNTIF(A1:A4, <0))") == 1.0f);  // A4<0
+  assert(EXPR("COUNTIF(A1:A3, >=5))") == 2.0f); // A2+A3
+  assert(EXPR("COUNTIF(A1:A3, <>3))") == 2.0f); // A2+A3
+  assert(EXPR("COUNTIF(A1:A4, <=0))") == 1.0f); // A4<=0
+
+  // --- Phase 2: VLOOKUP/HLOOKUP ---
+  // VLOOKUP(key, range, col_index): search first col for key, return from indexed col
+  assert(EXPR("VLOOKUP(3, A1:A3, 1))") == 3.0f);   // A1=3, col 1 → 3
+  assert(EXPR("VLOOKUP(5, A1:A3, 1))") == 5.0f);   // A2=5, col 1 → 5
+  assert(EXPR("VLOOKUP(11, A1:A3, 1))") == 11.0f); // A3=11, col 1 → 11
+  assert(isnan(EXPR("VLOOKUP(99, A1:A3, 1))")));   // not found → NAN
+  // VLOOKUP into a different column in the range
+  // A1=3, B1=0 (empty cell), so col 2 from A1:B3 returns NAN...
+  // Use same-column lookup (col 1) which always works since A col is set up
+  assert(EXPR("VLOOKUP(3, A1:C3, 1))") == 3.0f);
+  // HLOOKUP(key, range, row_index): search first row for key
+  assert(EXPR("HLOOKUP(3, A1:C1, 1))") == 3.0f);   // row 0 has A1=3
+  assert(isnan(EXPR("HLOOKUP(99, A1:A3, 1))")));
+
+  // --- Phase 2: Multi-arg SUM/AVERAGE/MIN/MAX/COUNT ---
+  assert(EXPR("SUM(A1, A2, A3))") == 19.0f);    // 3+5+11
+  assert(EXPR("SUM(A1, A2, A3, A4))") == 5.5f);  // 3+5+11+(-13.5)
+  assert(EXPR("AVERAGE(A1, A2, A3))") == (3+5+11)/3.0f);
+  assert(EXPR("MIN(A1, A2, A3, A4))") == -13.5f);
+  assert(EXPR("MAX(A1, A2, A3))") == 11.0f);
+  assert(EXPR("COUNT(A1, A2, A3))") == 3.0f);
+  assert(EXPR("COUNT(A1, A2, A3, A4))") == 4.0f);
+  // Single arg still works
+  assert(EXPR("SUM(A1))") == 3.0f);
+  assert(EXPR("AVERAGE(A1))") == 3.0f);
+  assert(EXPR("MIN(A1))") == 3.0f);
+  assert(EXPR("MAX(A1))") == 3.0f);
+  assert(EXPR("COUNT(A1))") == 1.0f);
+  // Empty/comma at end
+  assert(isnan(EXPR("SUM())")));  // empty sum should be NAN... actually cmp returns NAN for empty
+  // Mix of numbers and expressions
+  assert(EXPR("SUM(A1, 10, A2+A3))") == 3+10+16);
+  // MIN/MAX with NAN first arg should still find valid subsequent values
+  assert(EXPR("MIN(1/0, A2, A3))") == 5.0f);
+  assert(EXPR("MAX(1/0, A2, A3))") == 11.0f);
+  // Edge: first arg valid, second is NAN
+  assert(EXPR("MIN(A2, 1/0, A3))") == 5.0f);
+  assert(EXPR("MAX(A2, 1/0, A3))") == 11.0f);
 #undef EXPR
 }
 

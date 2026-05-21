@@ -20,9 +20,9 @@ Progress tracking for making kalk more like Google Sheets.
 
 ### Phase 2: Analytical functions (high-value spreadsheet features)
 
-- [ ] **SUMIF / COUNTIF** — conditional sum/count over a range
-- [ ] **VLOOKUP / HLOOKUP** — lookup values in a table
-- [ ] **SUM with multiple arguments** — `SUM(A1, B1, C1)` (comma-separated list)
+- [x] **SUMIF / COUNTIF** — conditional sum/count over a range with comparison operators
+- [x] **VLOOKUP / HLOOKUP** — exact-match lookup in a table range
+- [x] **SUM with multiple arguments** — `SUM(A1, B1, C1)` (comma-separated lists for SUM/AVERAGE/MIN/MAX/COUNT)
 
 ### Phase 3: String/type system (foundational)
 
