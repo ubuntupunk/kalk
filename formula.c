@@ -134,8 +134,12 @@ float func(struct parser* p) {
     else if (strcmp(fn, "COUNT") == 0)
       result = (float)count;
   } else if (!is_range) {
-    // IF(condition, true_val, false_val) — three comma-separated arguments
-    if (strcmp(fn, "IF") == 0) {
+    // Zero-argument functions: PI(), RAND()
+    if (strcmp(fn, "PI") == 0) {
+      result = 3.141592653589793f;
+    } else if (strcmp(fn, "RAND") == 0) {
+      result = (float)rand() / (float)RAND_MAX;
+    } else if (strcmp(fn, "IF") == 0) {
       float cond = cmp(p);
       skipws(p);
       if (*p->p != ',') return NAN;
@@ -150,11 +154,12 @@ float func(struct parser* p) {
       result = (cond != 0.0f && !isnan(cond)) ? tval : fval;
     } else {
       float arg = cmp(p);
-      // Optional second argument for ROUND/ROUNDUP/ROUNDDOWN
+      // Optional second argument for two-arg functions
       float arg2 = 0;
       int has_arg2 = 0;
       if (strcmp(fn, "ROUND") == 0 || strcmp(fn, "ROUNDUP") == 0 ||
-          strcmp(fn, "ROUNDDOWN") == 0) {
+          strcmp(fn, "ROUNDDOWN") == 0 || strcmp(fn, "POWER") == 0 ||
+          strcmp(fn, "MOD") == 0 || strcmp(fn, "RANDBETWEEN") == 0) {
         skipws(p);
         if (*p->p == ',') {
           p->p++;
@@ -195,6 +200,20 @@ float func(struct parser* p) {
         result = ceil(arg);
       else if (strcmp(fn, "FLOOR") == 0)
         result = floor(arg);
+      else if (strcmp(fn, "POWER") == 0)
+        result = pow(arg, arg2);
+      else if (strcmp(fn, "MOD") == 0)
+        result = arg2 != 0 ? fmod(arg, arg2) : NAN;
+      else if (strcmp(fn, "RANDBETWEEN") == 0)
+        result = arg + (float)rand() / (float)RAND_MAX * (arg2 - arg);
+      else if (strcmp(fn, "SIN") == 0)
+        result = sin(arg);
+      else if (strcmp(fn, "COS") == 0)
+        result = cos(arg);
+      else if (strcmp(fn, "TAN") == 0)
+        result = cos(arg) != 0 ? tan(arg) : NAN;
+      else if (strcmp(fn, "LOG") == 0)
+        result = arg > 0 ? log(arg) : NAN;
       else
         return NAN;
     }

@@ -16,7 +16,7 @@ Progress tracking for making kalk more like Google Sheets.
 ### Phase 1: Formula parser improvements (high-impact basics)
 
 - [x] **Comparison operators** — `<`, `>`, `<=`, `>=`, `=`, `<>`, `!=` for `IF(A1>5, ...)` and general use
-- [ ] **More math functions` — `POWER`, `MOD`, `PI`, `RAND`, `RANDBETWEEN`, `SIN`, `COS`, `TAN`, `LOG`
+- [x] **More math functions` — `POWER`, `MOD`, `PI`, `RAND`, `RANDBETWEEN`, `SIN`, `COS`, `TAN`, `LOG`
 
 ### Phase 2: Analytical functions (high-value spreadsheet features)
 

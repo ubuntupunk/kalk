@@ -95,6 +95,15 @@ The two syntaxes are fully compatible and can be mixed.
 | `CEILING` | Round up to integer | `=CEILING(A1)` |
 | `FLOOR` | Round down to integer | `=FLOOR(A1)` |
 | `IF` | Conditional: if cond is truthy, return a else b | `=IF(A1>5, A2, A3)` |
+| `POWER` | Raise to a power | `=POWER(A1, 2)` |
+| `MOD` | Modulo (remainder) | `=MOD(A1, 3)` |
+| `PI` | The constant π | `=PI()` |
+| `RAND` | Random number [0, 1) | `=RAND()` |
+| `RANDBETWEEN` | Random integer in [a, b] | `=RANDBETWEEN(1, 10)` |
+| `SIN` | Sine (radians) | `=SIN(A1)` |
+| `COS` | Cosine (radians) | `=COS(A1)` |
+| `TAN` | Tangent (radians) | `=TAN(A1)` |
+| `LOG` | Natural logarithm | `=LOG(A1)` |
 
 ### Comparison operators
 
@@ -108,7 +117,7 @@ Comparisons return 1 (true) or 0 (false):
 | `>=` | Greater than or equal | `=A1>=5` |
 | `=` | Equal to | `=A1=3` |
 | `<>` | Not equal to | `=A1<>5` |
-| `!=` | Not equal to (alt.) | `A1!=5` |
+| `!=` | Not equal to (alt.) | `=A1!=5` |
 
 Comparisons have lower precedence than arithmetic, so `A1+B2>10` parses as `(A1+B2)>10`.
 

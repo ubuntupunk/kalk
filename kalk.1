@@ -88,6 +88,33 @@ Round up to nearest integer
 .TP
 .B @FLOOR(expr)
 Round down to nearest integer
+.TP
+.B @POWER(expr, exp)
+Raise to a power (e.g. POWER(2, 3)=8)
+.TP
+.B @MOD(expr, divisor)
+Modulo (remainder)
+.TP
+.B @PI()
+The constant &pi (~3.14159)
+.TP
+.B @RAND()
+Random number in [0, 1)
+.TP
+.B @RANDBETWEEN(a, b)
+Random integer in [a, b]
+.TP
+.B @SIN(expr)
+Sine (radians)
+.TP
+.B @COS(expr)
+Cosine (radians)
+.TP
+.B @TAN(expr)
+Tangent (radians)
+.TP
+.B @LOG(expr)
+Natural logarithm
 .PP
 Functions can be used with or without the @ prefix (e.g. SUM(A1:A10)
 works the same as @SUM(A1:A10)). IF and ROUND/ROUNDUP/ROUNDDOWN

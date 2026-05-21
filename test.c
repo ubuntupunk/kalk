@@ -141,6 +141,39 @@ void test_expr(void) {
   // zero and edge cases
   assert(EXPR("IF(0, 1, 0))") == 0.0f);
   assert(EXPR("IF(1, 0, 1))") == 0.0f);
+  // Math functions: PI, RAND, POWER, MOD, RANDBETWEEN, SIN, COS, TAN, LOG
+  assert(EXPR("PI()") > 3.14159f && EXPR("PI()") < 3.14160f);
+  {
+    float r = EXPR("RAND()");
+    assert(r >= 0.0f && r < 1.0f);
+    // RAND should produce different values on repeated calls
+    float r2 = EXPR("RAND()");
+    assert(r2 >= 0.0f && r2 < 1.0f);
+  }
+  assert(EXPR("POWER(2, 3))") == 8.0f);
+  assert(EXPR("POWER(9, 0.5))") == 3.0f);
+  assert(EXPR("POWER(A1, 2))") == 9.0f);   // A1=3, 3^2=9
+  assert(EXPR("MOD(10, 3))") == 1.0f);
+  assert(EXPR("MOD(10, 2))") == 0.0f);
+  assert(isnan(EXPR("MOD(10, 0))")));  // division by zero → NAN
+  assert(EXPR("MOD(A2, A1))") == 2.0f);  // 5 mod 3 = 2
+  {
+    float r = EXPR("RANDBETWEEN(1, 10))");
+    assert(r >= 1.0f && r <= 10.0f);
+  }
+  assert(EXPR("SIN(0))") == 0.0f);
+  assert(EXPR("COS(0))") == 1.0f);
+  assert(EXPR("TAN(0))") == 0.0f);
+  assert(fabs(EXPR("SIN(PI()/2))") - 1.0f) < 0.0001f);  // sin(&pi/2)=1
+  assert(fabs(EXPR("COS(PI())") - (-1.0f)) < 0.0001f);   // cos(&pi)=-1
+  assert(fabs(EXPR("TAN(PI()/4))") - 1.0f) < 0.0001f);   // tan(&pi/4)=1
+  assert(EXPR("LOG(1))") == 0.0f);
+  assert(fabs(EXPR("LOG(PI())") - 1.1447f) < 0.001f);
+  assert(isnan(EXPR("LOG(0))")));
+  assert(isnan(EXPR("LOG(-1))")));
+  // = and @ prefix work with math functions
+  assert(EXPR("=POWER(2, 10))") == 1024.0f);
+  assert(EXPR("@MOD(17, 5))") == 2.0f);
 #undef EXPR
 }
 
