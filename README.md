@@ -94,7 +94,7 @@ The two syntaxes are fully compatible and can be mixed.
 | `ROUNDDOWN` | Round down | `=ROUNDDOWN(A1, 2)` |
 | `CEILING` | Round up to integer | `=CEILING(A1)` |
 | `FLOOR` | Round down to integer | `=FLOOR(A1)` |
-| `IF` | Conditional: if cond is truthy, return a else b | `=IF(A1>0, A2, A3)` |
+| `IF` | Conditional: if cond is truthy, return a else b | `=IF(A1, A2, A3)` |
 
 Cell references adjust automatically on replicate, insert, and delete.
 Use `$` for absolute references: `$A$1` (fixed), `$A1` (fixed column),

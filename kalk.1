@@ -61,6 +61,9 @@ Maximum value in range
 .B @COUNT(range)
 Count of numeric cells in range
 .TP
+.B @IF(cond, tval, fval)
+If cond is non-zero and not NAN, returns tval, else fval
+.TP
 .B @ABS(expr)
 Absolute value
 .TP
@@ -86,7 +89,9 @@ Round up to nearest integer
 Round down to nearest integer
 .PP
 Functions can be used with or without the @ prefix (e.g. SUM(A1:A10)
-works the same as @SUM(A1:A10)). Ranges can use either
+works the same as @SUM(A1:A10)). IF and ROUND/ROUNDUP/ROUNDDOWN
+accept comma-separated arguments (e.g. IF(A1, A2, A3)).
+Ranges can use either
 .B ...
 (e.g. A1...A10) or
 .B :
