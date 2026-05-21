@@ -262,18 +262,46 @@ float func(struct parser* p) {
   }
 
   float result = 0;
-  if (is_range && strcmp(fn, "SUM") == 0) {
-    if (c1 > c2) n = c1, c1 = c2, c2 = n;
-    if (r1 > r2) n = r1, r1 = r2, r2 = n;
+  if (is_range && (strcmp(fn, "SUM") == 0 || strcmp(fn, "AVERAGE") == 0 ||
+                   strcmp(fn, "MIN") == 0 || strcmp(fn, "MAX") == 0 ||
+                   strcmp(fn, "COUNT") == 0)) {
+    if (c1 > c2) { int t = c1; c1 = c2; c2 = t; }
+    if (r1 > r2) { int t = r1; r1 = r2; r2 = t; }
+    int count = 0;
+    float sum = 0, min_val = INFINITY, max_val = -INFINITY;
     for (int c = c1; c <= c2; c++)
       for (int r = r1; r <= r2; r++) {
         struct cell* cl = cell(p->g, c, r);
-        if (cl && cl->type != EMPTY && cl->type != LABEL) result += cl->val;
+        if (cl && cl->type != EMPTY && cl->type != LABEL) {
+          float v = cl->val;
+          sum += v;
+          if (v < min_val) min_val = v;
+          if (v > max_val) max_val = v;
+          count++;
+        }
       }
+    if (strcmp(fn, "SUM") == 0)
+      result = sum;
+    else if (strcmp(fn, "AVERAGE") == 0)
+      result = count > 0 ? sum / count : NAN;
+    else if (strcmp(fn, "MIN") == 0)
+      result = count > 0 ? min_val : NAN;
+    else if (strcmp(fn, "MAX") == 0)
+      result = count > 0 ? max_val : NAN;
+    else if (strcmp(fn, "COUNT") == 0)
+      result = (float)count;
   } else if (!is_range) {
     float arg = expr(p);
     if (strcmp(fn, "SUM") == 0)
       result = arg;
+    else if (strcmp(fn, "AVERAGE") == 0)
+      result = arg;
+    else if (strcmp(fn, "MIN") == 0)
+      result = arg;
+    else if (strcmp(fn, "MAX") == 0)
+      result = arg;
+    else if (strcmp(fn, "COUNT") == 0)
+      result = !isnan(arg) ? 1.0f : 0.0f;
     else if (strcmp(fn, "ABS") == 0)
       result = fabs(arg);
     else if (strcmp(fn, "INT") == 0)
@@ -1227,6 +1255,22 @@ void test_expr(void) {
   assert(EXPR("SUM(A1:A3))") == 19.0f);
   assert(EXPR("=SUM(A1:A3))") == 19.0f);
   assert(EXPR("=SUM(A3:A1))") == 19.0f);
+  // New functions: AVERAGE, MIN, MAX, COUNT
+  assert(EXPR("AVERAGE(A1:A3))") == (3.0f+5.0f+11.0f)/3.0f);
+  assert(EXPR("MIN(A1:A3))") == 3.0f);
+  assert(EXPR("MAX(A1:A3))") == 11.0f);
+  assert(EXPR("COUNT(A1:A3))") == 3.0f);
+  assert(EXPR("COUNT(A1:A4))") == 4.0f);
+  assert(EXPR("MIN(A1:A4))") == -13.5f);
+  assert(EXPR("MAX(A1:A4))") == 11.0f);
+  assert(EXPR("=AVERAGE(A1:A3))") == (3.0f+5.0f+11.0f)/3.0f);
+  assert(EXPR("=MIN(A1:A3))") == 3.0f);
+  assert(EXPR("=MAX(A1:A3))") == 11.0f);
+  assert(EXPR("@SUM(A1:A4))") == 5.5f);
+  assert(EXPR("AVERAGE(A1))") == 3.0f);
+  assert(EXPR("MIN(A1))") == 3.0f);
+  assert(EXPR("MAX(A1))") == 3.0f);
+  assert(EXPR("COUNT(A1))") == 1.0f);
 #undef EXPR
 }
 
