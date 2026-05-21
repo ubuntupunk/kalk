@@ -178,7 +178,7 @@ void setcell(struct grid* g, int c, int r, const char* input) {
   strncpy(cl->text, input, MAXIN - 1);
   g->dirty = 1;
 
-  if (input[0] == '+' || input[0] == '-' || input[0] == '(' || input[0] == '@') {
+  if (input[0] == '+' || input[0] == '-' || input[0] == '(' || input[0] == '@' || input[0] == '=') {
     cl->type = FORMULA;
   } else if (isdigit(input[0]) || input[0] == '.') {
     char* end;
@@ -251,8 +251,8 @@ float func(struct parser* p) {
   int n = ref(q, &c1, &r1);
   if (n) {
     q += n;
-    if (*q == '.' && *(q + 1) == '.' && *(q + 2) == '.') {
-      q += 3;
+    if ((*q == '.' && *(q + 1) == '.' && *(q + 2) == '.') || *q == ':') {
+      q += (*q == ':') ? 1 : 3;
       n = ref(q, &c2, &r2);
       if (n) {
         p->p = q + n;
@@ -304,6 +304,10 @@ float primary(struct parser* p) {
     p->p++;
     return func(p);
   }
+  if (*p->p == '=') {
+    p->p++;
+    return expr(p);
+  }
   if (*p->p == '(') {
     p->p++;
     float v = expr(p);
@@ -313,6 +317,15 @@ float primary(struct parser* p) {
     return v;
   }
   if (isdigit(*p->p) || *p->p == '.') return number(p);
+
+  // Google Sheets-style function call (no @ prefix): SUM(...)
+  if (isalpha(*p->p)) {
+    const char* saved = p->p;
+    float v = func(p);
+    if (!isnan(v)) return v;
+    p->p = saved;
+  }
+
   return cellval(p);
 }
 
@@ -1129,7 +1142,7 @@ void loop(struct grid* g) {
       nav(g);
     } else if (ch == '"') {
       entry(g, 1, 0);
-    } else if (ch == '+' || ch == '-' || ch == '(' || ch == '@' || ch == '.' || isdigit(ch)) {
+    } else if (ch == '+' || ch == '-' || ch == '(' || ch == '@' || ch == '=' || ch == '.' || isdigit(ch)) {
       entry(g, 0, ch);
     } else if (ch >= 32 && ch < 127) {
       entry(g, 1, ch);
@@ -1206,6 +1219,14 @@ void test_expr(void) {
   assert(EXPR("@SUM(A3...A1))") == 19.0f);
   assert(EXPR("@SUM(A1...A1))") == 3.0f);
   assert(EXPR("@SUM(A3...Z1))") == 19.0f);
+  // Google Sheets-style syntax
+  assert(EXPR("=A1+A2") == 8.0f);
+  assert(EXPR("=A1*A2") == 15.0f);
+  assert(EXPR("=SUM(A1...A3))") == 19.0f);
+  assert(EXPR("SUM(A1...A3))") == 19.0f);
+  assert(EXPR("SUM(A1:A3))") == 19.0f);
+  assert(EXPR("=SUM(A1:A3))") == 19.0f);
+  assert(EXPR("=SUM(A3:A1))") == 19.0f);
 #undef EXPR
 }
 

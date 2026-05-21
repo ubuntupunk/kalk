@@ -9,7 +9,8 @@ beyond ncurses.
 
 Inspired by VisiCalc and mostly compatible with it. Reads and writes CSV.
 Supports formulas with cell references, basic functions, cell formatting,
-row/column operations, and frozen titles.
+row/column operations, and frozen titles. Supports both traditional
+(`@SUM(A1...A4)`) and Google Sheets-style (`=SUM(A1:A4)`) syntax.
 
 ## Build
 
@@ -22,7 +23,7 @@ Requires a C99 compiler and ncurses.
 ## Usage
 
 Arrow keys navigate. Type a number or formula to enter data. Formulas
-start with `+`, `-`, `(`, or `@`. Anything else is a label.
+start with `+`, `-`, `(`, `@`, or `=`. Anything else is a label.
 
 Press `/` for commands:
 
@@ -53,9 +54,19 @@ Other keys:
 
 ## Formulas
 
+### Traditional syntax
+
 Arithmetic: `+A1*B2-3`, `(A1+A2)/2`
 
 Functions: `@SUM(A1...A10)`, `@ABS(x)`, `@INT(x)`, `@SQRT(x)`
+
+### Google Sheets-style syntax
+
+`=SUM(A1:A10)` — prefix with `=` and use `:` for ranges.
+
+Functions can also be used without `@` or `=`: `SUM(A1:A10)`.
+
+The two syntaxes are fully compatible and can be mixed.
 
 Cell references adjust automatically on replicate, insert, and delete.
 Use `$` for absolute references: `$A$1` (fixed), `$A1` (fixed column),

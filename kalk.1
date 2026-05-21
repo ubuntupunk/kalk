@@ -9,6 +9,8 @@ kalk \- a minimal terminal spreadsheet
 is a minimal VisiCalc-inspired spreadsheet for the terminal.
 It reads and writes CSV files and supports formulas, cell formatting,
 row/column operations, and title locking.
+Supports both traditional (@SUM(A1...A4)) and Google Sheets-style
+(=SUM(A1:A4)) formula syntax.
 .PP
 The grid supports columns A\-IV (256) and rows 1\-1024.
 .SH NAVIGATION
@@ -30,7 +32,7 @@ Go to a specific cell (type reference, e.g. B12)
 .SH ENTERING DATA
 .PP
 Type a number, formula, or label directly. Formulas start with
-.BR + ", " \- ", " ( ", or " @ .
+.BR + ", " \- ", " ( ", " @ ", or " = .
 Labels can be entered directly or prefixed with
 .BR \(dq .
 .TP
@@ -45,7 +47,7 @@ Formulas support arithmetic operators (+, \-, *, /), parentheses, cell
 references (e.g. A1, $B$2), and functions:
 .TP
 .B @SUM(range)
-Sum of values in range (e.g. @SUM(A1...A10))
+Sum of values in range (e.g. @SUM(A1...A10) or =SUM(A1:A10))
 .TP
 .B @ABS(expr)
 Absolute value
@@ -55,6 +57,13 @@ Integer part (truncate)
 .TP
 .B @SQRT(expr)
 Square root
+.PP
+Functions can be used with or without the @ prefix (e.g. SUM(A1:A10)
+works the same as @SUM(A1:A10)). Ranges can use either
+.B ...
+(e.g. A1...A10) or
+.B :
+(e.g. A1:A10).
 .PP
 Cell references can use
 .B $
