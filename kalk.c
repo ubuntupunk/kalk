@@ -292,6 +292,19 @@ float func(struct parser* p) {
       result = (float)count;
   } else if (!is_range) {
     float arg = expr(p);
+    // Optional second argument for ROUND/ROUNDUP/ROUNDDOWN
+    float arg2 = 0;
+    int has_arg2 = 0;
+    if (strcmp(fn, "ROUND") == 0 || strcmp(fn, "ROUNDUP") == 0 ||
+        strcmp(fn, "ROUNDDOWN") == 0) {
+      skipws(p);
+      if (*p->p == ',') {
+        p->p++;
+        skipws(p);
+        arg2 = expr(p);
+        has_arg2 = 1;
+      }
+    }
     if (strcmp(fn, "SUM") == 0)
       result = arg;
     else if (strcmp(fn, "AVERAGE") == 0)
@@ -308,6 +321,22 @@ float func(struct parser* p) {
       result = (int)arg;
     else if (strcmp(fn, "SQRT") == 0)
       result = arg >= 0 ? sqrt(arg) : NAN;
+    else if (strcmp(fn, "ROUND") == 0) {
+      int places = has_arg2 ? (int)arg2 : 0;
+      double f = pow(10.0, places);
+      result = round(arg * f) / f;
+    } else if (strcmp(fn, "ROUNDUP") == 0) {
+      int places = has_arg2 ? (int)arg2 : 0;
+      double f = pow(10.0, places);
+      result = ceil(arg * f) / f;
+    } else if (strcmp(fn, "ROUNDDOWN") == 0) {
+      int places = has_arg2 ? (int)arg2 : 0;
+      double f = pow(10.0, places);
+      result = floor(arg * f) / f;
+    } else if (strcmp(fn, "CEILING") == 0)
+      result = ceil(arg);
+    else if (strcmp(fn, "FLOOR") == 0)
+      result = floor(arg);
     else
       return NAN;
   } else {
@@ -1271,6 +1300,21 @@ void test_expr(void) {
   assert(EXPR("MIN(A1))") == 3.0f);
   assert(EXPR("MAX(A1))") == 3.0f);
   assert(EXPR("COUNT(A1))") == 1.0f);
+  // Rounding functions
+  assert(EXPR("ROUND(3.14159, 0))") == 3.0f);
+  assert(EXPR("ROUNDUP(3.14159, 0))") == 4.0f);
+  assert(EXPR("ROUNDDOWN(3.14159, 0))") == 3.0f);
+  assert(EXPR("CEILING(3.14))") == 4.0f);
+  assert(EXPR("FLOOR(3.14))") == 3.0f);
+  assert(EXPR("CEILING(A1))") == 3.0f);
+  assert(EXPR("FLOOR(A4))") == -14.0f);
+  assert(EXPR("ROUND(A1, 0))") == 3.0f);
+  assert(EXPR("ROUNDUP(A1, 0))") == 3.0f);
+  assert(EXPR("ROUNDDOWN(A1, 0))") == 3.0f);
+  assert(EXPR("ROUND(2.5, 0))") == 3.0f);
+  assert(EXPR("ROUND(1.5, 0))") == 2.0f);
+  assert(EXPR("CEILING(-3.5))") == -3.0f);
+  assert(EXPR("FLOOR(-3.5))") == -4.0f);
 #undef EXPR
 }
 
