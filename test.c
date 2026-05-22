@@ -1252,6 +1252,94 @@ void test_autofill(void) {
   assert(g.cells[0][4].val == 7.0f);
 }
 
+void test_undo_redo(void) {
+  static struct grid g = {0};
+
+  // Helper macro: set a cell and wrap in undo entry
+#define UNDO_SETCELL(GG, C, R, INPUT) do { \
+    undo_begin(UNDO_EDIT); \
+    undo_snap_cell(GG, C, R); \
+    undo_end(); \
+    setcell(GG, C, R, INPUT); \
+  } while (0)
+
+  // Set a cell, then undo, verify value restored
+  UNDO_SETCELL(&g, 0, 0, "42");
+  assert(g.cells[0][0].val == 42.0f);
+
+  // Undo the edit
+  assert(can_undo());
+  undo_perform(&g);
+  assert(g.cells[0][0].type == EMPTY);
+
+  // Redo
+  assert(can_redo());
+  redo_perform(&g);
+  assert(g.cells[0][0].val == 42.0f);
+
+  // Multiple edits: set A1=10, A2=20, undo twice
+  memset(&g, 0, sizeof(g));
+  UNDO_SETCELL(&g, 0, 0, "10");
+  UNDO_SETCELL(&g, 0, 1, "20");
+  assert(g.cells[0][0].val == 10.0f);
+  assert(g.cells[0][1].val == 20.0f);
+
+  undo_perform(&g);
+  assert(g.cells[0][1].type == EMPTY);
+  undo_perform(&g);
+  assert(g.cells[0][0].type == EMPTY);
+
+  redo_perform(&g);
+  assert(g.cells[0][0].val == 10.0f);
+  redo_perform(&g);
+  assert(g.cells[0][1].val == 20.0f);
+
+  // Undo after formula edit: A1=5, B1=+A1*2, undo B1
+  memset(&g, 0, sizeof(g));
+  UNDO_SETCELL(&g, 0, 0, "5");
+  UNDO_SETCELL(&g, 1, 0, "+A1*2");
+  recalc(&g);
+  assert(g.cells[1][0].val == 10.0f);
+
+  undo_perform(&g);
+  assert(g.cells[1][0].type == EMPTY);
+  redo_perform(&g);
+  recalc(&g);
+  assert(g.cells[1][0].val == 10.0f);
+
+  // Insert/delete row undo
+  memset(&g, 0, sizeof(g));
+  UNDO_SETCELL(&g, 0, 0, "10");
+  UNDO_SETCELL(&g, 0, 1, "20");
+  insertrow(&g, 1);  // inserts blank row at 1, pushes old row 1 to row 2
+  assert(g.cells[0][0].val == 10.0f);
+  assert(g.cells[0][1].type == EMPTY);
+  assert(g.cells[0][2].val == 20.0f);
+
+  undo_perform(&g);  // undo insert row
+  assert(g.cells[0][0].val == 10.0f);
+  assert(g.cells[0][1].val == 20.0f);
+
+  redo_perform(&g);  // redo insert row
+  assert(g.cells[0][0].val == 10.0f);
+  assert(g.cells[0][1].type == EMPTY);
+  assert(g.cells[0][2].val == 20.0f);
+
+  // New edit after undo clears redo stack
+  memset(&g, 0, sizeof(g));
+  UNDO_SETCELL(&g, 0, 0, "1");
+  UNDO_SETCELL(&g, 1, 0, "2");
+  assert(can_undo());
+  undo_perform(&g);  // undo B1 edit
+  assert(g.cells[1][0].type == EMPTY);
+  assert(can_redo());
+  // New edit should clear redo
+  UNDO_SETCELL(&g, 0, 0, "99");  // edit A1
+  assert(!can_redo());  // redo stack cleared
+
+#undef UNDO_SETCELL
+}
+
 void test_color_cond_fields(void) {
   static struct grid g = {0};
 
@@ -1322,5 +1410,6 @@ int main(void) {
   test_parsedate();
   test_date_arithmetic();
   test_duration_format();
+  test_undo_redo();
   return 0;
 }

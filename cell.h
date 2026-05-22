@@ -22,6 +22,45 @@ struct cell {
   int is_str;          // 1 if cell value is a string result (from string-returning formula)
 };
 
+struct grid;  // forward declaration
+
+// Undo/Redo system
+#define UNDO_MAX_CELLS 4096
+#define UNDO_STACK_SIZE 100
+
+enum undotype {
+  UNDO_EDIT, UNDO_INSERT_ROW, UNDO_INSERT_COL, UNDO_DELETE_ROW, UNDO_DELETE_COL,
+  UNDO_SWAP_ROW, UNDO_SWAP_COL, UNDO_SORT, UNDO_CLEAR,
+  UNDO_PASTE, UNDO_CUT, UNDO_REPLICATE, UNDO_AUTOFILL,
+  UNDO_BLANK, UNDO_FORMAT, UNDO_CLEARSHEET,
+  UNDO_ENTRY_EDIT, UNDO_REPLICATE_CMD
+};
+
+struct undocell {
+  int c, r;
+  struct cell data;
+};
+
+struct undoentry {
+  enum undotype type;
+  int n;
+  struct undocell cells[UNDO_MAX_CELLS];
+};
+
+extern struct undoentry undo_stack[UNDO_STACK_SIZE];
+extern int undo_pos;      // index of top undo entry (-1 = empty)
+extern int undo_top;       // next free slot for push
+
+const char* undo_type_str(enum undotype type);
+void undo_begin(enum undotype type);
+void undo_snap_cell(struct grid* g, int c, int r);
+void undo_snap_range(struct grid* g, int c1, int r1, int c2, int r2);
+void undo_end(void);
+int can_undo(void);
+int can_redo(void);
+void undo_perform(struct grid* g);
+void redo_perform(struct grid* g);
+
 struct grid {
   struct cell cells[NCOL][NROW];
   int cc, cr, vc, vr, tc, tr, fmt, dirty;

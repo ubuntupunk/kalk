@@ -616,12 +616,14 @@ int command(struct grid* g) {
   refresh();
   int ch = toupper(getch());
   if (ch == 'B') {  // blank current cell
+    undo_begin(UNDO_BLANK); undo_snap_cell(g, g->cc, g->cr); undo_end();
     setcell(g, g->cc, g->cr, "");
     recalc(g);
   } else if (ch == 'C') {  // clear sheet
     mvprintw(1, 0, "Clear entire sheet? (y/N)"), clrtoeol();
     ch = getch();
     if (ch == 'y' || ch == 'Y') {
+      undo_begin(UNDO_CLEARSHEET); undo_snap_range(g, 0, 0, NCOL - 1, NROW - 1); undo_end();
       for (int r = 0; r < NROW; r++)
         for (int c = 0; c < NCOL; c++) g->cells[c][r] = (struct cell){0};
       g->dirty = 1;
@@ -647,6 +649,7 @@ int command(struct grid* g) {
     ch = toupper(getch());
     struct cell* cl = cell(g, g->cc, g->cr);
     if (strchr("LRIGD$%*TUS", ch) || ch == 't' || ch == 'T') {
+      undo_begin(UNDO_FORMAT); undo_snap_cell(g, g->cc, g->cr); undo_end();
       // Distinguish 'T' (date YYYY-MM-DD) vs 't' (time HH:MM:SS)
       if (ch == 't') cl->fmt = 't';
       else if (ch == 'T') cl->fmt = 'T';
@@ -654,23 +657,27 @@ int command(struct grid* g) {
     } else if (ch == 'P' || ch == 'p') {  // Date picker
       datepicker(g);
     } else if (ch == 'C') {
+      undo_begin(UNDO_FORMAT); undo_snap_cell(g, g->cc, g->cr); undo_end();
       mvprintw(1, 0, "Fg: 0=blk 1=Red 2=Grn 3=Yel 4=Blu 5=Mag 6=Cyn 7=Wht"), clrtoeol();
       ch = toupper(getch());
       int col = ch - '0';
       if (col >= 0 && col <= 7) cl->color = col;
     } else if (ch == 'B') {
+      undo_begin(UNDO_FORMAT); undo_snap_cell(g, g->cc, g->cr); undo_end();
       mvprintw(1, 0, "Bg: 0=blk 1=Red 2=Grn 3=Yel 4=Blu 5=Mag 6=Cyn 7=Wht"), clrtoeol();
       ch = toupper(getch());
       int col = ch - '0';
       if (col >= 0 && col <= 7) cl->bg = col;
       g->dirty = 1;
     } else if (ch == 'O') {
+      undo_begin(UNDO_FORMAT); undo_snap_cell(g, g->cc, g->cr); undo_end();
       mvprintw(1, 0, "Attr: 0=none 1=Bold 2=Italic 3=Both"), clrtoeol();
       ch = getch();
       int a = ch - '0';
       if (a >= 0 && a <= 3) cl->attr = a;
       g->dirty = 1;
     } else if (ch == 'X') {
+      undo_begin(UNDO_FORMAT); undo_snap_cell(g, g->cc, g->cr); undo_end();
       cl->color = 0;
       cl->bg = 0;
       cl->attr = 0;
@@ -769,6 +776,18 @@ int command(struct grid* g) {
   } else if (ch == 'P') {  // previous sheet
     if (cur_sheet > 0) cur_sheet--;
     recalc(curgrid());
+  } else if (ch == (0x1f & 'z')) {  // Ctrl+Z: Undo
+    if (can_undo()) {
+      undo_perform(g);
+      mvprintw(1, 0, "Undo: %s", undo_type_str(undo_stack[undo_pos + 1].type));
+      clrtoeol(); refresh(); napms(500);
+    }
+  } else if (ch == (0x1f & 'y')) {  // Ctrl+Y: Redo
+    if (can_redo()) {
+      redo_perform(g);
+      mvprintw(1, 0, "Redo: %s", undo_type_str(undo_stack[undo_pos].type));
+      clrtoeol(); refresh(); napms(500);
+    }
   } else if (ch == 'W') {  // worksheet management
     mvprintw(1, 0, "Sheet: N(e)w (R)ename (D)elete (I)mport (L)eft (R)i (C)olor?"), clrtoeol();
     ch = toupper(getch());
@@ -904,8 +923,7 @@ int command(struct grid* g) {
     } else if (ch == 'N') {
       g->tc = g->tr = 0;
       g->vc = g->vr = 0;
-    }
-  } else if (ch == 'O') {  // sort rows by column
+    }    } else if (ch == 'O') {  // sort rows by column
     mvprintw(1, 0, "Sort by column (e.g. A, B, AA): "), clrtoeol();
     char sbuf[16] = {0};
     int sn = 0;
@@ -1350,6 +1368,7 @@ void entry(struct grid* g, int label, int ch) {
         continue;
       }
       ac_clear_popup();
+      undo_begin(UNDO_ENTRY_EDIT); undo_snap_cell(g, g->cc, g->cr); undo_end();
       setcell(g, g->cc, g->cr, buf);
       if (g->cr < NROW - 1) g->cr++;
       break;
@@ -1367,6 +1386,7 @@ void entry(struct grid* g, int label, int ch) {
         continue;
       }
       ac_clear_popup();
+      undo_begin(UNDO_ENTRY_EDIT); undo_snap_cell(g, g->cc, g->cr); undo_end();
       setcell(g, g->cc, g->cr, buf);
       if (g->cc < NCOL - 1) g->cc++;
       break;
@@ -1479,7 +1499,12 @@ void loop(void) {
       g->cc++;
     else if (ch == 10 || ch == 13 || ch == KEY_ENTER) {  // Enter: next row
       if (g->cr < NROW - 1) g->cr++;
+    } else if ((ch == (0x1f & 'z') || ch == (0x1f & 'Z')) && can_undo()) {  // Ctrl+Z: Undo
+      undo_perform(g);
+    } else if ((ch == (0x1f & 'y') || ch == (0x1f & 'Y')) && can_redo()) {  // Ctrl+Y: Redo
+      redo_perform(g);
     } else if (ch == 127 || ch == 8 || ch == KEY_BACKSPACE) {  // Bsp/Del: clear cell
+      undo_begin(UNDO_EDIT); undo_snap_cell(g, g->cc, g->cr); undo_end();
       struct cell* cl = cell(g, g->cc, g->cr);
       if (cl) *cl = (struct cell){0};
       recalc(g);

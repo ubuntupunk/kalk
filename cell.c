@@ -200,7 +200,157 @@ int sheetbyname(const char* name) {
     return -1;
 }
 
-// Clipboard
+// ---- Undo/Redo system ----
+
+struct undoentry undo_stack[UNDO_STACK_SIZE];
+int undo_pos = -1;       // index of top undo entry, -1 = empty
+int undo_top = 0;         // next free slot for push
+
+// Working entry being built (static, not reentrant)
+static struct undoentry* cur_entry = NULL;
+static int in_undo = 0;  // prevent recursion when undo/redo calls settcell etc.
+
+const char* undo_type_str(enum undotype type) {
+  switch (type) {
+    case UNDO_EDIT:           return "Edit cell";
+    case UNDO_ENTRY_EDIT:     return "Edit cell";
+    case UNDO_INSERT_ROW:     return "Insert row";
+    case UNDO_INSERT_COL:     return "Insert column";
+    case UNDO_DELETE_ROW:     return "Delete row";
+    case UNDO_DELETE_COL:     return "Delete column";
+    case UNDO_SWAP_ROW:       return "Swap row";
+    case UNDO_SWAP_COL:       return "Swap column";
+    case UNDO_SORT:           return "Sort column";
+    case UNDO_PASTE:          return "Paste";
+    case UNDO_CUT:            return "Cut";
+    case UNDO_REPLICATE_CMD:  return "Replicate cell";
+    case UNDO_AUTOFILL:       return "Auto-fill";
+    case UNDO_BLANK:          return "Blank cell";
+    case UNDO_FORMAT:         return "Format cell";
+    case UNDO_CLEARSHEET:     return "Clear sheet";
+    default:                  return "Undo";
+  }
+}
+
+// Begin building an undo entry. Clears any redo entries beyond undo_pos.
+void undo_begin(enum undotype type) {
+  if (in_undo) { cur_entry = NULL; return; }
+  // Clear redo: entries after undo_pos are invalidated
+  undo_top = undo_pos + 1;
+  if (undo_top < UNDO_STACK_SIZE) {
+    cur_entry = &undo_stack[undo_top];
+    cur_entry->type = type;
+    cur_entry->n = 0;
+  } else {
+    cur_entry = NULL;
+  }
+}
+
+// Save a single cell's state into the current undo entry.
+void undo_snap_cell(struct grid* g, int c, int r) {
+  if (in_undo) return;
+  if (!cur_entry) return;
+  if (c < 0 || c >= NCOL || r < 0 || r >= NROW) return;
+  if (cur_entry->n >= UNDO_MAX_CELLS) return;
+  int idx = cur_entry->n;
+  cur_entry->cells[idx].c = c;
+  cur_entry->cells[idx].r = r;
+  cur_entry->cells[idx].data = g->cells[c][r];
+  cur_entry->n++;
+}
+
+// Save a rectangular range of cells.
+void undo_snap_range(struct grid* g, int c1, int r1, int c2, int r2) {
+  if (in_undo || !cur_entry) return;
+  if (c1 > c2) { int t = c1; c1 = c2; c2 = t; }
+  if (r1 > r2) { int t = r1; r1 = r2; r2 = t; }
+  for (int r = r1; r <= r2; r++) {
+    for (int c = c1; c <= c2; c++) {
+      if (c < 0 || c >= NCOL || r < 0 || r >= NROW) continue;
+      if (cur_entry->n >= UNDO_MAX_CELLS) return;
+      int idx = cur_entry->n;
+      cur_entry->cells[idx].c = c;
+      cur_entry->cells[idx].r = r;
+      cur_entry->cells[idx].data = g->cells[c][r];
+      cur_entry->n++;
+    }
+  }
+}
+
+// Finalize and push the current undo entry to the stack.
+void undo_end(void) {
+  if (in_undo) return;
+  if (!cur_entry || cur_entry->n == 0) return;
+  undo_pos = undo_top;
+  undo_top++;
+  if (undo_top > UNDO_STACK_SIZE) {
+    // Stack full: shift all entries down by 1 (discard oldest)
+    for (int i = 0; i < UNDO_STACK_SIZE - 1; i++)
+      undo_stack[i] = undo_stack[i + 1];
+    undo_pos = UNDO_STACK_SIZE - 1;
+    undo_top = UNDO_STACK_SIZE;
+  }
+  cur_entry = NULL;
+}
+
+int can_undo(void) {
+  return (undo_pos >= 0);
+}
+
+int can_redo(void) {
+  return (undo_top > undo_pos + 1 && undo_pos + 1 < UNDO_STACK_SIZE);
+}
+
+// Perform undo: swap current cell states with the undo entry's stored states.
+// After swapping, the undo entry now holds the "current" state (for redo).
+void undo_perform(struct grid* g) {
+  if (!can_undo()) return;
+  in_undo = 1;
+  struct undoentry* entry = &undo_stack[undo_pos];
+  
+  // Swap current cells with stored cells
+  for (int i = 0; i < entry->n; i++) {
+    int c = entry->cells[i].c;
+    int r = entry->cells[i].r;
+    if (c >= 0 && c < NCOL && r >= 0 && r < NROW) {
+      struct cell tmp = g->cells[c][r];
+      g->cells[c][r] = entry->cells[i].data;
+      entry->cells[i].data = tmp;
+    }
+  }
+  
+  undo_pos--;
+  g->dirty = 1;
+  recalc(g);
+  in_undo = 0;
+}
+
+// Perform redo: increment position, then swap again.
+// The swap toggles between the old state and the new state.
+void redo_perform(struct grid* g) {
+  if (!can_redo()) return;
+  in_undo = 1;
+  
+  undo_pos++;
+  struct undoentry* entry = &undo_stack[undo_pos];
+  
+  // Swap current cells with stored cells
+  for (int i = 0; i < entry->n; i++) {
+    int c = entry->cells[i].c;
+    int r = entry->cells[i].r;
+    if (c >= 0 && c < NCOL && r >= 0 && r < NROW) {
+      struct cell tmp = g->cells[c][r];
+      g->cells[c][r] = entry->cells[i].data;
+      entry->cells[i].data = tmp;
+    }
+  }
+  
+  g->dirty = 1;
+  recalc(g);
+  in_undo = 0;
+}
+
+// ---- Clipboard ----
 struct clipcell clipboard[CLIPBOARD_MAX];
 int clip_w = 0, clip_h = 0;
 
@@ -231,14 +381,15 @@ void yank_cells(struct grid* g, int c1, int r1, int c2, int r2) {
         }
     clip_w = w;
     clip_h = h;
-}
-
-void paste_cells(struct grid* g, int tc, int tr) {
-    if (clip_w < 1 || clip_h < 1) return;
-    int idx = 0;
-    for (int r = 0; r < clip_h; r++) {
-        for (int c = 0; c < clip_w; c++) {
-            int dc = tc + c, dr = tr + r;
+}void paste_cells(struct grid* g, int tc, int tr) {
+  if (clip_w < 1 || clip_h < 1) return;
+  undo_begin(UNDO_PASTE);
+  undo_snap_range(g, tc, tr, tc + clip_w - 1, tr + clip_h - 1);
+  undo_end();
+  int idx = 0;
+  for (int r = 0; r < clip_h; r++) {
+    for (int c = 0; c < clip_w; c++) {
+      int dc = tc + c, dr = tr + r;
             if (dc >= NCOL || dr >= NROW) { idx++; continue; }
             struct clipcell* cc = &clipboard[idx++];
             if (cc->type != EMPTY) {
@@ -261,19 +412,20 @@ void paste_cells(struct grid* g, int tc, int tr) {
     }
     recalc(g);
     g->dirty = 1;
-}
-
-void cut_cells(struct grid* g, int c1, int r1, int c2, int r2) {
-    yank_cells(g, c1, r1, c2, r2);
-    if (c1 > c2) { int t = c1; c1 = c2; c2 = t; }
-    if (r1 > r2) { int t = r1; r1 = r2; r2 = t; }
-    for (int r = r1; r <= r2; r++)
-        for (int c = c1; c <= c2; c++) {
-            struct cell* cl = cell(g, c, r);
-            if (cl) *cl = (struct cell){0};
-        }
-    recalc(g);
-    g->dirty = 1;
+}void cut_cells(struct grid* g, int c1, int r1, int c2, int r2) {
+  yank_cells(g, c1, r1, c2, r2);
+  undo_begin(UNDO_CUT);
+  if (c1 > c2) { int t = c1; c1 = c2; c2 = t; }
+  if (r1 > r2) { int t = r1; r1 = r2; r2 = t; }
+  undo_snap_range(g, c1, r1, c2, r2);
+  undo_end();
+  for (int r = r1; r <= r2; r++)
+    for (int c = c1; c <= c2; c++) {
+      struct cell* cl = cell(g, c, r);
+      if (cl) *cl = (struct cell){0};
+    }
+  recalc(g);
+  g->dirty = 1;
 }
 
 
@@ -413,6 +565,9 @@ static void shiftrefs(struct grid* g, int axis, int pos, int dir) {
 }
 
 void insertrow(struct grid* g, int at) {
+  undo_begin(UNDO_INSERT_ROW);
+  undo_snap_range(g, 0, at, NCOL - 1, NROW - 1);
+  undo_end();
   for (int c = 0; c < NCOL; c++)
     for (int r = NROW - 1; r > at; r--) g->cells[c][r] = g->cells[c][r - 1];
   for (int c = 0; c < NCOL; c++) g->cells[c][at] = (struct cell){0};
@@ -421,6 +576,9 @@ void insertrow(struct grid* g, int at) {
 }
 
 void insertcol(struct grid* g, int at) {
+  undo_begin(UNDO_INSERT_COL);
+  undo_snap_range(g, at, 0, NCOL - 1, NROW - 1);
+  undo_end();
   for (int r = 0; r < NROW; r++)
     for (int c = NCOL - 1; c > at; c--) g->cells[c][r] = g->cells[c - 1][r];
   for (int r = 0; r < NROW; r++) g->cells[at][r] = (struct cell){0};
@@ -429,6 +587,9 @@ void insertcol(struct grid* g, int at) {
 }
 
 void deleterow(struct grid* g, int at) {
+  undo_begin(UNDO_DELETE_ROW);
+  undo_snap_range(g, 0, at, NCOL - 1, NROW - 1);
+  undo_end();
   shiftrefs(g, 'R', at, -1);
   for (int c = 0; c < NCOL; c++)
     for (int r = at; r < NROW - 1; r++) g->cells[c][r] = g->cells[c][r + 1];
@@ -437,6 +598,9 @@ void deleterow(struct grid* g, int at) {
 }
 
 void deletecol(struct grid* g, int at) {
+  undo_begin(UNDO_DELETE_COL);
+  undo_snap_range(g, at, 0, NCOL - 1, NROW - 1);
+  undo_end();
   shiftrefs(g, 'C', at, -1);
   for (int r = 0; r < NROW; r++)
     for (int c = at; c < NCOL - 1; c++) g->cells[c][r] = g->cells[c + 1][r];
@@ -579,6 +743,9 @@ void swapcol(struct grid* g, int a, int b) {
 }
 
 void sortbycol(struct grid* g, int col) {
+  undo_begin(UNDO_SORT);
+  undo_snap_range(g, 0, 0, NCOL - 1, NROW - 1);
+  undo_end();
   // Bubble sort: put EMPTY/LABEL cells at bottom, sort NUM/FORMULA by value ascending
   for (int i = 0; i < NROW - 1; i++) {
     for (int j = 0; j < NROW - 1 - i; j++) {
@@ -622,6 +789,15 @@ static int in_table(const char* s, const char* const* table, int n) {
 // seed_c,seed_r = first seed cell; seed_n = number of seed cells (consecutive in fill direction)
 // count = number of new cells to fill beyond the seed
 void autofill(struct grid* g, int seed_c, int seed_r, int seed_n, int count, int fill_right) {
+  undo_begin(UNDO_AUTOFILL);
+  // Save target cells ahead of time
+  for (int i = 0; i < count; i++) {
+    int target_idx = seed_n + i;
+    int tc = fill_right ? (seed_c + target_idx) : seed_c;
+    int tr = fill_right ? seed_r : (seed_r + target_idx);
+    if (tc < NCOL && tr < NROW) undo_snap_cell(g, tc, tr);
+  }
+  undo_end();
   if (seed_n < 1 || count < 1) return;
   if (seed_n > 16) seed_n = 16;
   if (count > 1024) count = 1024;  // safety cap
@@ -738,6 +914,9 @@ void autofill(struct grid* g, int seed_c, int seed_r, int seed_n, int count, int
 }
 
 void replicatecell(struct grid* g, int sc, int sr, int dc, int dr) {
+  undo_begin(UNDO_REPLICATE_CMD);
+  undo_snap_cell(g, dc, dr);
+  undo_end();
   struct cell* src = cell(g, sc, sr);
   struct cell* dst = cell(g, dc, dr);
   if (!src || !dst) return;

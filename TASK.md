@@ -75,6 +75,21 @@ Progress tracking for making kalk more like Google Sheets.
 - [x] **History-based suggestions** — rank recently used functions higher
 - [x] **Multi-line popup with scrolling** — if many matches, allow scrolling through them
 
+### Phase 9: Date Arithmetic, Duration Format, Range Autocomplete
+
+- [x] **Date arithmetic** — `A1+7` on a date cell displays as shifted date via format propagation in `recalc()`
+- [x] **Duration format** — `/F S` to display cells as `HH:MM:SS` (e.g., 1.5 → `36:00:00`)
+- [x] **Cell range autocomplete** — suggest adjacent ranges after typing `SUM(` in the autocomplete popup
+
+### Phase 10: Undo/Redo
+
+- [x] **Undo/Redo stack** — `struct undocell` + `struct undoentry` snapshot system, 100-entry stack with 4096 cells max per entry
+- [x] **Swap-based undo/redo** — `undo_perform`/`redo_perform` swap current↔stored cells; no separate redo stack needed
+- [x] **Instrumented operations** — insert/delete row/col, sort, autofill, replicate, paste, cut, and cell edits all record undo snapshots
+- [x] **Ctrl+Z / Ctrl+Y** — keyboard shortcuts work in both navigation loop and entry mode
+- [x] **Recursion guard** — `in_undo` flag prevents re-entrant undo calls during `recalc()`
+- [x] **Redo stack invalidation** — new edit after undo clears redo entries
+
 ---
 
 ## Legend
