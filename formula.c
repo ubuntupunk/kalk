@@ -397,9 +397,18 @@ float func(struct parser* p) {
     } else if (strcmp(fn, "RAND") == 0) {
       result = (float)rand() / (float)RAND_MAX;
     } else if (strcmp(fn, "TODAY") == 0) {
-      result = (float)((double)time(NULL) / 86400.0);
+      time_t now = time(NULL);
+      struct tm* tm_ = localtime(&now);
+      if (tm_) result = (float)days_from_epoch(tm_->tm_year + 1900, tm_->tm_mon + 1, tm_->tm_mday);
+      else result = NAN;
     } else if (strcmp(fn, "NOW") == 0) {
-      result = (float)((double)time(NULL) / 86400.0);
+      time_t now = time(NULL);
+      struct tm* tm_ = localtime(&now);
+      if (tm_) {
+        long d = days_from_epoch(tm_->tm_year + 1900, tm_->tm_mon + 1, tm_->tm_mday);
+        double tod = (tm_->tm_hour * 3600.0 + tm_->tm_min * 60.0 + tm_->tm_sec) / 86400.0;
+        result = (float)((double)d + tod);
+      } else result = NAN;
     } else if (strcmp(fn, "IF") == 0) {
       float cond = cmp(p);
       skipws(p);
@@ -555,19 +564,137 @@ float func(struct parser* p) {
       if (*p->p != ')') return NAN;
       p->p++;
       return NAN;    } else if (strcmp(fn, "DATE") == 0) {
-      float y = cmp(p); skipws(p);
+      int y = (int)cmp(p); skipws(p);
       if (*p->p != ',') return NAN; p->p++; skipws(p);
-      float m = cmp(p); skipws(p);
+      int m = (int)cmp(p); skipws(p);
       if (*p->p != ',') return NAN; p->p++; skipws(p);
-      float d = cmp(p);
-      struct tm tm = {0};
-      tm.tm_year = (int)y - 1900;
-      tm.tm_mon = (int)m - 1;
-      tm.tm_mday = (int)d;
-      time_t t = mktime(&tm);
-      result = (float)((double)t / 86400.0);
+      int d = (int)cmp(p);
+      result = (float)days_from_epoch(y, m, d);
 
+    // Date/time extraction functions (UTC-based: serial is days since epoch)
+    } else if (strcmp(fn, "YEAR") == 0) {
+      float serial = cmp(p);
+      int days = (int)serial;
+      double frac = serial - days;
+      time_t t = (time_t)days * 86400LL + (time_t)(frac * 86400.0 + 0.5);
+      struct tm* tm_ = gmtime(&t);
+      result = tm_ ? (float)(tm_->tm_year + 1900) : NAN;
+    } else if (strcmp(fn, "MONTH") == 0) {
+      float serial = cmp(p);
+      int days = (int)serial;
+      double frac = serial - days;
+      time_t t = (time_t)days * 86400LL + (time_t)(frac * 86400.0 + 0.5);
+      struct tm* tm_ = gmtime(&t);
+      result = tm_ ? (float)(tm_->tm_mon + 1) : NAN;
+    } else if (strcmp(fn, "DAY") == 0) {
+      float serial = cmp(p);
+      int days = (int)serial;
+      double frac = serial - days;
+      time_t t = (time_t)days * 86400LL + (time_t)(frac * 86400.0 + 0.5);
+      struct tm* tm_ = gmtime(&t);
+      result = tm_ ? (float)tm_->tm_mday : NAN;
+    } else if (strcmp(fn, "HOUR") == 0) {
+      float serial = cmp(p);
+      int days = (int)serial;
+      double frac = serial - days;
+      time_t t = (time_t)days * 86400LL + (time_t)(frac * 86400.0 + 0.5);
+      struct tm* tm_ = gmtime(&t);
+      result = tm_ ? (float)tm_->tm_hour : NAN;
+    } else if (strcmp(fn, "MINUTE") == 0) {
+      float serial = cmp(p);
+      int days = (int)serial;
+      double frac = serial - days;
+      time_t t = (time_t)days * 86400LL + (time_t)(frac * 86400.0 + 0.5);
+      struct tm* tm_ = gmtime(&t);
+      result = tm_ ? (float)tm_->tm_min : NAN;
+    } else if (strcmp(fn, "SECOND") == 0) {
+      float serial = cmp(p);
+      int days = (int)serial;
+      double frac = serial - days;
+      time_t t = (time_t)days * 86400LL + (time_t)(frac * 86400.0 + 0.5);
+      struct tm* tm_ = gmtime(&t);
+      result = tm_ ? (float)tm_->tm_sec : NAN;
+    } else if (strcmp(fn, "WEEKDAY") == 0) {
+      float serial = cmp(p);
+      int days = (int)serial;
+      double frac = serial - days;
+      time_t t = (time_t)days * 86400LL + (time_t)(frac * 86400.0 + 0.5);
+      struct tm* tm_ = gmtime(&t);
+      int wday = tm_ ? tm_->tm_wday : -1;  // 0=Sun..6=Sat
+      if (wday < 0) { result = NAN; }
+      else {
+        // Optional second arg: 1 (default) Sun=1..Sat=7, 2 Mon=1..Sun=7, 3 Mon=0..Sun=6
+        int type = 1;
+        skipws(p);
+        if (*p->p == ',') { p->p++; skipws(p); type = (int)cmp(p); }
+        if (type == 2) result = (float)((wday + 6) % 7 + 1);  // Mon=1..Sun=7
+        else if (type == 3) result = (float)((wday + 6) % 7); // Mon=0..Sun=6
+        else result = (float)(wday + 1);  // Sun=1..Sat=7
+      }
+    } else if (strcmp(fn, "DATEDIF") == 0) {
+      float start = cmp(p); skipws(p);
+      if (*p->p != ',') return NAN; p->p++; skipws(p);
+      float end_ = cmp(p); skipws(p);
+      if (*p->p != ',') return NAN; p->p++; skipws(p);
+      // Read unit string (e.g., "Y", "M", "D")
+      char unit[4] = {0};
+      if (*p->p == '"') {
+        p->p++;
+        int ui = 0;
+        while (*p->p && *p->p != '"' && ui < 3) unit[ui++] = toupper(*p->p++);
+        if (*p->p == '"') p->p++;
       } else {
+        for (int ui = 0; ui < 3 && *p->p; ui++) unit[ui] = toupper(*p->p++);
+      }
+      int sdays = (int)start;
+      int edays = (int)end_;
+      double sfrac = start - sdays;
+      double efrac = end_ - edays;
+      time_t ts = (time_t)sdays * 86400LL + (time_t)(sfrac * 86400.0 + 0.5);
+      time_t te = (time_t)edays * 86400LL + (time_t)(efrac * 86400.0 + 0.5);
+      // gmtime uses a static buffer — copy first result BEFORE next gmtime call
+      struct tm tms_buf, tme_buf;
+      struct tm* tms_ptr = gmtime(&ts);
+      if (!tms_ptr) { result = NAN; }
+      else {
+        tms_buf = *tms_ptr;
+        struct tm* tme_ptr = gmtime(&te);
+        if (!tme_ptr) { result = NAN; }
+        else {
+          tme_buf = *tme_ptr;
+        double diff = difftime(te, ts);  // seconds
+        if (strcmp(unit, "Y") == 0) {
+          int years = tme_buf.tm_year - tms_buf.tm_year;
+          if (tme_buf.tm_mon < tms_buf.tm_mon || (tme_buf.tm_mon == tms_buf.tm_mon && tme_buf.tm_mday < tms_buf.tm_mday))
+            years--;
+          result = (float)years;
+        } else if (strcmp(unit, "M") == 0) {
+          int months = (tme_buf.tm_year - tms_buf.tm_year) * 12 + (tme_buf.tm_mon - tms_buf.tm_mon);
+          if (tme_buf.tm_mday < tms_buf.tm_mday) months--;
+          result = (float)months;
+        } else if (strcmp(unit, "D") == 0) {
+          result = (float)(diff / 86400.0);
+        } else if (strcmp(unit, "MD") == 0) {
+          // Days between, ignoring months and years
+          result = (float)((tme_buf.tm_mday - tms_buf.tm_mday + 30) % 30);
+        } else if (strcmp(unit, "YM") == 0) {
+          // Months between, ignoring years
+          int m = (tme_buf.tm_mon - tms_buf.tm_mon + 12) % 12;
+          if (tme_buf.tm_mday < tms_buf.tm_mday) m = (m - 1 + 12) % 12;
+          result = (float)m;
+        } else if (strcmp(unit, "YD") == 0) {
+          // Days between, ignoring years
+          struct tm tmcpy = tms_buf;
+          tmcpy.tm_year = tme_buf.tm_year;
+          time_t tc = mktime(&tmcpy);
+          if (tc > te) { tmcpy.tm_year = tme_buf.tm_year - 1; tc = mktime(&tmcpy); }
+          result = (float)(difftime(te, tc) / 86400.0);
+        } else {
+          result = NAN;
+        }
+      }  // closes inner else (tme_buf)
+    }  // closes outer else (tms_buf)
+    } else {
         float arg = cmp(p);
 
       // Multi-argument aggregating functions: SUM(A1, B1, C1), etc.

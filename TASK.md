@@ -57,12 +57,12 @@ Progress tracking for making kalk more like Google Sheets.
 
 ### Phase 7: Date/Time System
 
-- [ ] **Time component in dates** — show `HH:MM` alongside dates; store fractional days for time
-- [ ] **More date functions** — `YEAR()`, `MONTH()`, `DAY()`, `HOUR()`, `MINUTE()`, `SECOND()`, `WEEKDAY()`, `DATEDIF()`
-- [ ] **Auto-detect date input** — when the user types "2024-01-15" or "1/15/2024", auto-set format to `'T'`
+- [x] **Time component in dates** — show `HH:MM` alongside dates; store fractional days for time
+- [x] **More date functions** — `YEAR()`, `MONTH()`, `DAY()`, `HOUR()`, `MINUTE()`, `SECOND()`, `WEEKDAY()`, `DATEDIF()`
+- [x] **Auto-detect date input** — when the user types "2024-01-15" or "1/15/2024", auto-set format to `'T'`
 - [ ] **Date arithmetic** — adding days to a date (e.g. `A1+7` shifts a date by 7 days)
-- [ ] **Custom date formats** — `YYYY-MM-DD`, `MM/DD/YYYY`, `DD-Mon-YYYY`, etc.
-- [ ] **Date picker popup** — a mini calendar UI to pick a date when in date-formatted cell
+- [x] **Custom date formats** — `YYYY-MM-DD`, `MM/DD/YYYY`, `DD-Mon-YYYY`, etc.
+- [x] **Date picker popup** — a mini calendar UI to pick a date when in date-formatted cell
 - [ ] **Duration/time formatting** — `HH:MM:SS` display, time arithmetic
 
 ### Phase 8: Formula Autocomplete Enhancements

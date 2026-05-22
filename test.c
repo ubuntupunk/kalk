@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 void test_expr(void) {
   static struct grid g = {0};
@@ -957,6 +958,107 @@ void test_text_functions(void) {
 #undef EXPR
 }
 
+void test_date_functions(void) {
+  static struct grid g = {0};
+  struct parser p = {0};
+#define EXPR(e) (p.s = p.p = e, p.g = &g, p.arg_str[0] = '\0', p.has_str_result = 0, cmp(&p))
+
+  // Set up a date serial: March 15, 2024  (exact integer days since epoch)
+  float serial = (float)days_from_epoch(2024, 3, 15);
+  g.cells[0][0].type = NUM;
+  g.cells[0][0].val = serial;
+
+  // Also a time: 12:00 PM on same day (serial + 0.5)
+  float time_serial = serial + 0.5f;  // 12:00 = 0.5 (exactly representable in float)
+  g.cells[1][0].type = NUM;  // B1
+  g.cells[1][0].val = time_serial;
+
+  // YEAR
+  float y = EXPR("YEAR(A1))");
+  assert(fabs(y - 2024) < 0.1f);
+
+  // MONTH
+  assert(fabs(EXPR("MONTH(A1))") - 3.0f) < 0.1f);
+
+  // DAY
+  assert(fabs(EXPR("DAY(A1))") - 15.0f) < 0.1f);
+
+  // HOUR (should be 0 for pure date)
+  assert(fabs(EXPR("HOUR(A1))") - 0.0f) < 0.1f);
+
+  // MINUTE
+  assert(fabs(EXPR("MINUTE(A1))") - 0.0f) < 0.1f);
+
+  // SECOND
+  assert(fabs(EXPR("SECOND(A1))") - 0.0f) < 0.1f);
+
+  // HOUR on time value (12:00 = noon)
+  assert(fabs(EXPR("HOUR(B1))") - 12.0f) < 0.1f);
+  assert(fabs(EXPR("MINUTE(B1))") - 0.0f) < 0.1f);
+  assert(fabs(EXPR("SECOND(B1))") - 0.0f) < 0.1f);
+
+  // WEEKDAY: March 15, 2024 is a Friday (5=Friday in Sun=1 system)
+  assert(fabs(EXPR("WEEKDAY(A1))") - 6.0f) < 0.1f);  // Sun=1 → Fri=6
+  assert(fabs(EXPR("WEEKDAY(A1, 2))") - 5.0f) < 0.1f);  // Mon=1 → Fri=5
+  assert(fabs(EXPR("WEEKDAY(A1, 3))") - 4.0f) < 0.1f);  // Mon=0 → Fri=4
+
+  // DATE: create March 20, 2024
+  float d20_val = EXPR("DATE(2024, 3, 20))");
+  assert(d20_val > serial);  // March 20 > March 15
+
+  // Days between serial (March 15) and March 20 = 5
+  assert(fabs(d20_val - serial - 5.0f) < 0.5f);
+
+  // Set up cells for DATEDIF with explicit string arguments
+  g.cells[3][0].type = NUM;
+  g.cells[3][0].val = EXPR("DATE(2024, 1, 15))");  // D1 = Jan 15
+  g.cells[4][0].type = NUM;
+  g.cells[4][0].val = EXPR("DATE(2024, 3, 15))");  // E1 = Mar 15
+
+  // DATEDIF(Jan15, Mar15, "M") = 2 months
+  g.cells[5][0].type = FORMULA;
+  strcpy(g.cells[5][0].text, "DATEDIF(D1, E1, \"M\"))");
+  recalc(&g);
+  assert(fabs(g.cells[5][0].val - 2.0f) < 0.1f);
+
+  // DATEDIF(Jan15, Mar15, "D") = 60 days (approx)
+  g.cells[5][0].type = FORMULA;
+  strcpy(g.cells[5][0].text, "DATEDIF(D1, E1, \"D\"))");
+  recalc(&g);
+  assert(fabs(g.cells[5][0].val - 60.0f) < 1.0f);
+
+#undef EXPR
+}
+
+void test_parsedate(void) {
+  extern int parsedate(const char* input, float* serial);
+  float s;
+
+  // YYYY-MM-DD
+  assert(parsedate("2024-03-15", &s) == 1);
+  assert(s > 10000);  // reasonable serial number
+
+  // MM/DD/YYYY
+  assert(parsedate("03/15/2024", &s) == 1);
+  assert(s > 10000);
+
+  // DD-Mon-YYYY
+  assert(parsedate("15-Mar-2024", &s) == 1);
+  assert(s > 10000);
+
+  // HH:MM time only
+  assert(parsedate("14:30", &s) == 1);
+  assert(s > 0.0f && s < 1.0f);  // fractional day
+
+  // HH:MM:SS
+  assert(parsedate("14:30:15", &s) == 1);
+
+  // Non-date should not match
+  assert(parsedate("hello", &s) == 0);
+  assert(parsedate("42", &s) == 0);
+  assert(parsedate("", &s) == 0);
+}
+
 void test_autofill(void) {
   static struct grid g = {0};
 
@@ -1149,5 +1251,7 @@ int main(void) {
   test_color_cond_fields();
   test_text_functions();
   test_autofill();
+  test_date_functions();
+  test_parsedate();
   return 0;
 }

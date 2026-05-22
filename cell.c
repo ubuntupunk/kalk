@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 int CW = 8;  // column display width
 
@@ -14,10 +15,11 @@ static int my_strcasecmp(const char* a, const char* b);
 // Function name list for autocomplete (alphabetical, NULL-terminated)
 const char* const func_names[] = {
     "ABS", "AVERAGE", "CEILING", "CONCATENATE", "COS", "COUNT", "COUNTIF",
-    "DATE", "FIND", "FLOOR", "HLOOKUP", "IF", "INT", "LEFT", "LEN", "LOG",
-    "LOWER", "MAX", "MID", "MIN", "MOD", "NOW", "PI", "POWER", "RAND",
-    "RANDBETWEEN", "RIGHT", "ROUND", "ROUNDDOWN", "ROUNDUP", "SIN", "SQRT",
-    "SUM", "SUMIF", "TAN", "TODAY", "TRIM", "UPPER", "VLOOKUP",
+    "DATE", "DATEDIF", "DAY", "FIND", "FLOOR", "HLOOKUP", "HOUR", "IF",
+    "INT", "LEFT", "LEN", "LOG", "LOWER", "MAX", "MID", "MIN", "MINUTE",
+    "MOD", "MONTH", "NOW", "PI", "POWER", "RAND", "RANDBETWEEN", "RIGHT",
+    "ROUND", "ROUNDDOWN", "ROUNDUP", "SECOND", "SIN", "SQRT", "SUM", "SUMIF",
+    "TAN", "TODAY", "TRIM", "UPPER", "VLOOKUP", "WEEKDAY", "YEAR",
     NULL
 };
 
@@ -316,6 +318,63 @@ void deletecol(struct grid* g, int at) {
   g->dirty = 1;
 }
 
+// Days from 1970-01-01 (proleptic Gregorian), returns exact integer day count
+// Based on Howard Hinnant's civil date algorithm
+long days_from_epoch(int year, int month, int day) {
+  year -= (month <= 2);
+  int era = (year >= 0 ? year : year - 399) / 400;
+  int yoe = year - era * 400;
+  int doy = (153 * (month - 3 + 12 * (month <= 2)) + 2) / 5 + day - 1;
+  int doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+  return (long)era * 146097 + doe - 719468;
+}
+
+// Try to parse common date formats and return serial number on success.
+// Returns 1 if input looks like a date, with serial set accordingly.
+int parsedate(const char* input, float* serial) {
+  int y, m, d;
+  // YYYY-MM-DD
+  if (sscanf(input, "%d-%d-%d", &y, &m, &d) >= 3) {
+    if (y >= 1900 && y <= 2100 && m >= 1 && m <= 12 && d >= 1 && d <= 31) {
+      *serial = (float)days_from_epoch(y, m, d);
+      return 1;
+    }
+  }
+  // MM/DD/YYYY or M/D/YYYY
+  if (sscanf(input, "%d/%d/%d", &m, &d, &y) >= 3) {
+    if (y >= 1900 && y <= 2100 && m >= 1 && m <= 12 && d >= 1 && d <= 31) {
+      *serial = (float)days_from_epoch(y, m, d);
+      return 1;
+    }
+  }
+  // DD-Mon-YYYY (e.g., 15-Jan-2024)
+  char mon[4] = {0};
+  if (sscanf(input, "%d-%3s-%d", &d, mon, &y) >= 3) {
+    static const char* mons[] = {"jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"};
+    for (int i = 0; i < 12; i++) {
+      int match = 1;
+      for (int j = 0; j < 3; j++) {
+        if (toupper(mon[j]) != toupper(mons[i][j])) { match = 0; break; }
+      }
+      if (match) {
+        if (y >= 1900 && y <= 2100 && d >= 1 && d <= 31) {
+          *serial = (float)days_from_epoch(y, i + 1, d);
+          return 1;
+        }
+      }
+    }
+  }
+  // HH:MM or HH:MM:SS time-only input (store as fractional day)
+  int h, mi, s = 0;
+  if (sscanf(input, "%d:%d:%d", &h, &mi, &s) >= 2) {
+    if (h >= 0 && h < 24 && mi >= 0 && mi < 60 && s >= 0 && s < 60) {
+      *serial = (h * 3600 + mi * 60 + s) / 86400.0f;
+      return 1;
+    }
+  }
+  return 0;
+}
+
 void setcell(struct grid* g, int c, int r, const char* input) {
   struct cell* cl = cell(g, c, r);
   if (!cl) return;
@@ -332,7 +391,16 @@ void setcell(struct grid* g, int c, int r, const char* input) {
   cl->strval[0] = '\0';
   cl->is_str = 0;
 
-  if (input[0] == '+' || input[0] == '-' || input[0] == '(' || input[0] == '@' || input[0] == '=') {
+  // Auto-detect date inputs
+  float serial;
+  int is_date = 0;
+  if (parsedate(input, &serial)) {
+    cl->type = NUM;
+    cl->val = serial;
+    cl->fmt = 'T';  // auto-set format to date
+    snprintf(cl->strval, MAXIN, "%g", serial);
+    is_date = 1;
+  } else if (input[0] == '+' || input[0] == '-' || input[0] == '(' || input[0] == '@' || input[0] == '=') {
     cl->type = FORMULA;
   } else if (isdigit(input[0]) || input[0] == '.') {
     char* end;
@@ -348,7 +416,7 @@ void setcell(struct grid* g, int c, int r, const char* input) {
     cl->is_str = 1;
     strncpy(cl->strval, input, MAXIN - 1);
   }
-  recalc(g);
+  if (!is_date) recalc(g);
 }
 
 const char* cell_str(struct grid* g, int c, int r) {

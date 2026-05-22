@@ -28,11 +28,22 @@ static void fmtcell(struct grid* g, struct cell* cl, char* fb, int cw) {
       snprintf(t, sizeof(t), "%.2f", cl->val);
     } else if (fmt == '%') {
       snprintf(t, sizeof(t), "%.2f%%", cl->val * 100);
-    } else if (fmt == 'T') {
-      time_t t_ = (time_t)(cl->val * 86400);
-      struct tm* tm_ = localtime(&t_);
-      if (tm_) strftime(t, sizeof(t), "%Y-%m-%d", tm_);
-      else snprintf(t, sizeof(t), "%g", cl->val);
+    } else if (fmt == 'T' || fmt == 'U' || fmt == 'u' || fmt == 't') {
+      long days = (long)cl->val;
+      double frac = (double)cl->val - days;
+      time_t t_ = days * 86400LL + (time_t)(frac * 86400.0 + 0.5);
+      struct tm* tm_ = gmtime(&t_);
+      if (tm_) {
+        int has_time = (fabs(frac) > 0.0001);
+        const char* fmtstr = "%Y-%m-%d";
+        if (fmt == 'U') fmtstr = "%m/%d/%Y";
+        else if (fmt == 'u') fmtstr = "%d-%b-%Y";
+        else if (fmt == 't') fmtstr = "%H:%M:%S";
+        else if (fmt == 'T' && has_time) fmtstr = "%Y-%m-%d %H:%M";
+        strftime(t, sizeof(t), fmtstr, tm_);
+      } else {
+        snprintf(t, sizeof(t), "%g", cl->val);
+      }
       fmt = 'L';
     } else if (fmt == '*') {
       for (int i = 0; i < cw && i < cl->val; i++) t[i] = '*';
@@ -430,11 +441,147 @@ void autofillcmd(struct grid* g) {
   g->dirty = 1;
 }
 
+// Date picker: mini calendar popup
+void datepicker(struct grid* g) {
+  // Get current cell value as date, default to today
+  time_t now = time(NULL);
+  struct cell* cl = cell(g, g->cc, g->cr);
+  int has_date = 0;
+  int year, month, day;
+  if (cl && cl->type == NUM) {
+    time_t t = (time_t)(cl->val * 86400);
+    struct tm* tm_ = localtime(&t);
+    if (tm_) {
+      year = tm_->tm_year;
+      month = tm_->tm_mon;
+      day = tm_->tm_mday;
+      has_date = 1;
+    }
+  }
+  if (!has_date) {
+    struct tm* tm_ = localtime(&now);
+    year = tm_->tm_year;
+    month = tm_->tm_mon;
+    day = tm_->tm_mday;
+  }
+
+  int ay = year, am = month, ad = day;
+  int sel = 0;  // 0=day, 1=month, 2=year
+  int exit = 0;
+  while (!exit) {
+    // Build calendar for current month
+    struct tm caltm = {0};
+    caltm.tm_year = ay;
+    caltm.tm_mon = am;
+    caltm.tm_mday = 1;
+    mktime(&caltm);
+    int first_dow = caltm.tm_wday;  // 0=Sun
+    int days_in_month;
+    {
+      struct tm tmp = caltm;
+      tmp.tm_mon++;
+      mktime(&tmp);
+      days_in_month = (int)((mktime(&tmp) - mktime(&caltm)) / 86400);
+    }
+
+    // Draw calendar on lines 2-10 (over grid columns header + first rows)
+    char title[32];
+    strftime(title, sizeof(title), "%B %Y", &caltm);
+    for (int r = 0; r < 9; r++) {
+      move(2 + r, 2);
+      clrtoeol();
+    }
+    attron(A_BOLD);
+    mvprintw(2, 2, "%s", title);
+    attroff(A_BOLD);
+    mvprintw(3, 2, "Su Mo Tu We Th Fr Sa");
+    int d = 1;
+    for (int w = 0; w < 6 && d <= days_in_month; w++) {
+      move(4 + w, 2);
+      for (int dow = 0; dow < 7; dow++) {
+        if ((w == 0 && dow < first_dow) || d > days_in_month) {
+          printw("   ");
+        } else {
+          int is_today = (ay == year && am == month && d == ad);
+          int is_cur = (sel == 0 && d == day && ay == year && am == month);
+          if (is_cur) attron(A_REVERSE);
+          else if (is_today) attron(A_BOLD);
+          mvprintw(4 + w, 2 + dow * 3, "%2d", d);
+          if (is_cur) attroff(A_REVERSE);
+          else if (is_today) attroff(A_BOLD);
+          d++;
+        }
+      }
+    }
+    mvprintw(10, 2, "Tab: field  Arrow: adjust  Enter: select  Esc: cancel");
+    int ch = getch();
+    if (ch == 27) { exit = 1; }
+    else if (ch == 9) { sel = (sel + 1) % 3; }  // Tab
+    else if (ch == 10 || ch == 13 || ch == KEY_ENTER) {
+      // Confirm selection
+      if (sel == 0) {
+        struct tm setm = {0};
+        setm.tm_year = ay;
+        setm.tm_mon = am;
+        setm.tm_mday = day;
+        time_t t = mktime(&setm);
+        if (t != (time_t)-1) {
+          float serial = (float)((double)t / 86400.0);
+          char buf[MAXIN];
+          snprintf(buf, sizeof(buf), "%g", serial);
+          setcell(g, g->cc, g->cr, buf);
+          struct cell* cl2 = cell(g, g->cc, g->cr);
+          if (cl2) cl2->fmt = 'T';
+          g->dirty = 1;
+        }
+      }
+      exit = 1;
+    }
+    else if (ch == KEY_UP) {
+      if (sel == 0) day -= 7;
+      else if (sel == 1) am = (am - 1 + 12) % 12;
+      else if (sel == 2) ay--;
+    }
+    else if (ch == KEY_DOWN) {
+      if (sel == 0) day += 7;
+      else if (sel == 1) am = (am + 1) % 12;
+      else if (sel == 2) ay++;
+    }
+    else if (ch == KEY_LEFT) {
+      if (sel == 0) day--;
+      else if (sel == 1) am = (am - 1 + 12) % 12;
+      else if (sel == 2) ay--;
+    }
+    else if (ch == KEY_RIGHT) {
+      if (sel == 0) day++;
+      else if (sel == 1) am = (am + 1) % 12;
+      else if (sel == 2) ay++;
+    }
+    // Clamp day to valid range
+    {
+      struct tm caltm2 = {0};
+      caltm2.tm_year = ay;
+      caltm2.tm_mon = am;
+      caltm2.tm_mday = 1;
+      mktime(&caltm2);
+      // Calculate days in month
+      struct tm tmp2 = caltm2;
+      tmp2.tm_mon++;
+      time_t t1 = mktime(&caltm2);
+      time_t t2 = mktime(&tmp2);
+      int dim = (int)((t2 - t1) / 86400);
+      if (day < 1) day = 1;
+      if (day > dim) day = dim;
+    }
+  }
+}
+
 //
 //  /A                   Auto-fill pattern (linear, date names, or copy)
 //  /B                   Blank current cell value (keep formatting)
 //  /C                   Clear entire spreadsheet (keep formatting)
-//  /F(L/R/I/G/D/$/%/*/T) Set cell format: Left/Right/Integer/General/Dollar/Percent/Date
+//  /F(L/R/I/G/D/$/%/*/T/t/U/u) Set cell format
+//  /F P                 Date picker popup calendar
 //  /DR, /DC             Delete row/column
 //  /IR, /IC             Insert row/column
 //  /GC                  Set column width
@@ -487,11 +634,17 @@ int command(struct grid* g) {
       insertcol(g, g->cc);
     recalc(g);
   } else if (ch == 'F') {  // change cell format/color/condition
-    mvprintw(1, 0, "Fmt: L R I G D $ %% * T | Fg(C) | (B)g | Attr(O) | (N)cond | (X)clear"), clrtoeol();
+    mvprintw(1, 0, "Fmt: L R I G D $ %% * T(d) U(u) t(ime) | Fg(C) | (B)g | Attr(O) | (N)cond | (X)clear | (P)icker"), clrtoeol();
     ch = toupper(getch());
     struct cell* cl = cell(g, g->cc, g->cr);
-    if (strchr("LRIGD$%*T", ch)) cl->fmt = ch;
-    else if (ch == 'C') {
+    if (strchr("LRIGD$%*TU", ch) || ch == 't' || ch == 'T') {
+      // Distinguish 'T' (date YYYY-MM-DD) vs 't' (time HH:MM:SS)
+      if (ch == 't') cl->fmt = 't';
+      else if (ch == 'T') cl->fmt = 'T';
+      else cl->fmt = ch;
+    } else if (ch == 'P' || ch == 'p') {  // Date picker
+      datepicker(g);
+    } else if (ch == 'C') {
       mvprintw(1, 0, "Fg: 0=blk 1=Red 2=Grn 3=Yel 4=Blu 5=Mag 6=Cyn 7=Wht"), clrtoeol();
       ch = toupper(getch());
       int col = ch - '0';

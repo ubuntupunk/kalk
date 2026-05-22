@@ -36,13 +36,19 @@ struct parser {
 };
 
 // Function name list for autocomplete (null-terminated)
-#define NFUNCS 40
+#define NFUNCS 48
 extern const char* const func_names[];
 
 // Cell operations
 struct cell* cell(struct grid* g, int c, int r);
 void setcell(struct grid* g, int c, int r, const char* input);
 void recalc(struct grid* g);
+
+// Date parsing (returns 1 if input is a date, sets serial)
+int parsedate(const char* input, float* serial);
+
+// Days from 1970-01-01 (proleptic Gregorian), returns exact integer day count
+long days_from_epoch(int year, int month, int day);
 
 // Row/column operations
 void insertrow(struct grid* g, int at);
