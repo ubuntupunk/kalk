@@ -28,6 +28,15 @@ static void fmtcell(struct grid* g, struct cell* cl, char* fb, int cw) {
       snprintf(t, sizeof(t), "%.2f", cl->val);
     } else if (fmt == '%') {
       snprintf(t, sizeof(t), "%.2f%%", cl->val * 100);
+    } else if (fmt == 'S') {
+      // Duration: display HH:MM:SS from serial (whole days → hours)
+      long total_sec = (long)(cl->val * 86400.0 + 0.5);
+      if (total_sec < 0) total_sec = 0;
+      int h = (int)(total_sec / 3600);
+      int m = (int)((total_sec % 3600) / 60);
+      int s = (int)(total_sec % 60);
+      snprintf(t, sizeof(t), "%d:%02d:%02d", h, m, s);
+      fmt = 'L';
     } else if (fmt == 'T' || fmt == 'U' || fmt == 'u' || fmt == 't') {
       long days = (long)cl->val;
       double frac = (double)cl->val - days;
@@ -634,10 +643,10 @@ int command(struct grid* g) {
       insertcol(g, g->cc);
     recalc(g);
   } else if (ch == 'F') {  // change cell format/color/condition
-    mvprintw(1, 0, "Fmt: L R I G D $ %% * T(d) U(u) t(ime) | Fg(C) | (B)g | Attr(O) | (N)cond | (X)clear | (P)icker"), clrtoeol();
+    mvprintw(1, 0, "Fmt: L R I G D $ %% * T(d) U(u) t(ime) S(dura) | Fg(C) | (B)g | Attr(O) | (N)cond | (X)clear | (P)icker"), clrtoeol();
     ch = toupper(getch());
     struct cell* cl = cell(g, g->cc, g->cr);
-    if (strchr("LRIGD$%*TU", ch) || ch == 't' || ch == 'T') {
+    if (strchr("LRIGD$%*TUS", ch) || ch == 't' || ch == 'T') {
       // Distinguish 'T' (date YYYY-MM-DD) vs 't' (time HH:MM:SS)
       if (ch == 't') cl->fmt = 't';
       else if (ch == 'T') cl->fmt = 'T';
@@ -1097,6 +1106,45 @@ static void ac_record_usage(int idx) {
   func_history[0] = idx;
 }
 
+// Suggest cell range from adjacent non-empty cells (above or left of cursor)
+// out is set to range string like "A1...A5" or empty if none found.
+static void ac_suggest_range(struct grid* g, char* out, int outsz) {
+  out[0] = '\0';
+  int cc = g->cc, cr = g->cr;
+  if (cc < 0 || cr < 0) return;
+
+  // Check for adjacent non-empty cells above in same column
+  int top = cr;
+  while (top > 0) {
+    struct cell* cl = cell(g, cc, top - 1);
+    if (!cl || cl->type == EMPTY) break;
+    top--;
+  }
+  int n_rows = cr - top;
+
+  // Check for adjacent non-empty cells to the left in same row
+  int left = cc;
+  while (left > 0) {
+    struct cell* cl = cell(g, left - 1, cr);
+    if (!cl || cl->type == EMPTY) break;
+    left--;
+  }
+  int n_cols = cc - left;
+
+  if (n_rows >= 2 && n_rows >= n_cols) {
+    // Suggest column range: C(top+1)...C(cr)
+    char cf[16];
+    snprintf(cf, sizeof(cf), "%s%d", col(cc), top + 1);
+    snprintf(out, outsz, "%s...%s%d", cf, col(cc), cr);
+  } else if (n_cols >= 2) {
+    // Suggest row range: left...cc-1 in same row
+    char cf[16], cf2[16];
+    snprintf(cf, sizeof(cf), "%s%d", col(left), cr + 1);
+    snprintf(cf2, sizeof(cf2), "%s%d", col(cc - 1), cr + 1);
+    snprintf(out, outsz, "%s...%s", cf, cf2);
+  }
+}
+
 // Clear popup area (lines 2-10)
 static void ac_clear_popup(void) {
   for (int r = 2; r <= 10; r++) {
@@ -1159,55 +1207,88 @@ void entry(struct grid* g, int label, int ch) {
   char buf[MAXIN] = {0};
   int n = 0, ac_sel = 0, ac_n = 0, ac_indices[30];
   int ac_active = 0;  // 1 if popup is being shown
+  char ac_range_hint[64] = {0};  // range suggestion (e.g. "A1...A5")
+  int ac_range_sel = 0;  // -1=range selected, 0=function selected
   draw(g, "ENTRY", "");
   if (ch && !label) {
     buf[n++] = ch;
     buf[n] = '\0';
     ac_n = ac_matches(buf, ac_indices, 30);
+    // Check for range suggestion after '(' 
+    if (ac_n == 0) {
+      ac_suggest_range(g, ac_range_hint, sizeof(ac_range_hint));
+      if (ac_range_hint[0]) ac_range_sel = -1;
+    }
     ac_sel = 0;
-    ac_active = (ac_n > 0);
+    ac_active = (ac_n > 0 || ac_range_sel < 0);
   }
   for (;;) {
     mvprintw(1, 0, "> %s_", buf);
     clrtoeol();
     // Draw autocomplete popup
-    if (ac_active && ac_n > 0) {
-      int max_vis = 7;  // max visible items at once
-      int start = ac_sel - max_vis / 2;
+    if (ac_active && (ac_n > 0 || ac_range_hint[0])) {
+      int max_vis = 7;
+      // Compute total items: function matches + range hint
+      int total_items = ac_n + (ac_range_hint[0] ? 1 : 0);
+      int sel_abs = (ac_range_sel < 0) ? 0 : ac_sel + 1;
+      
+      int start = sel_abs - max_vis / 2;
       if (start < 0) start = 0;
-      if (start + max_vis > ac_n) start = ac_n - max_vis;
+      if (start + max_vis > total_items) start = total_items - max_vis;
       if (start < 0) start = 0;
 
-      // Line 2: Argument hint (sig of currently selected function)
+      // Line 2: hint for current selection
       move(2, 2);
       clrtoeol();
-      int sel_idx = ac_indices[ac_sel];
-      attron(A_BOLD);
-      mvprintw(2, 2, "%s", func_sigs[sel_idx]);
-      attroff(A_BOLD);
+      if (ac_range_sel < 0) {
+        // Range hint selected
+        attron(A_BOLD);
+        mvprintw(2, 2, "Insert range: %s", ac_range_hint);
+        attroff(A_BOLD);
+      } else if (ac_n > 0) {
+        int sel_idx = ac_indices[ac_sel];
+        attron(A_BOLD);
+        mvprintw(2, 2, "%s", func_sigs[sel_idx]);
+        attroff(A_BOLD);
+      }
 
-      // Lines 3-9: Function names, one per line
+      // Lines 3-9: Items, one per line (range hint first if present, then functions)
       int disp = 0;
-      for (int i = start; i < ac_n && disp < max_vis; i++, disp++) {
+      for (int i = start; i < total_items && disp < max_vis; i++, disp++) {
         int row = 3 + disp;
         move(row, 2);
         clrtoeol();
-        int idx = ac_indices[i];
-        int is_cur = (i == ac_sel);
+        int is_cur = (i == sel_abs);
         if (is_cur) attron(A_REVERSE);
-        // Prefix hint: show first letters of match in bold
-        mvprintw(row, 2, "%-20s", func_names[idx]);
+        
+        // Compute absolute index
+        int abs_idx = i;
+        int has_range = ac_range_hint[0] ? 1 : 0;
+        if (has_range && abs_idx == 0) {
+          // First item = range suggestion
+          mvprintw(row, 2, "%-20s", ac_range_hint);
+        } else {
+          int func_idx = abs_idx - has_range;
+          if (func_idx >= 0 && func_idx < ac_n) {
+            mvprintw(row, 2, "%-20s", func_names[ac_indices[func_idx]]);
+          }
+        }
+        
         if (is_cur) attroff(A_REVERSE);
       }
 
-      // Line 10: Description of selected function
+      // Line 10: Description
       move(10, 2);
       clrtoeol();
-      mvprintw(10, 2, "%s", func_descs[sel_idx]);
+      if (ac_range_sel < 0) {
+        mvprintw(10, 2, "Insert adjacent range");
+      } else if (ac_n > 0 && ac_sel >= 0 && ac_sel < ac_n) {
+        int sel_idx = ac_indices[ac_sel];
+        mvprintw(10, 2, "%s", func_descs[sel_idx]);
+      }
 
-      // Scroll indicator if there are more items
       if (start > 0) mvprintw(3, 25, "^");
-      if (start + max_vis < ac_n) mvprintw(3 + max_vis - 1, 25, "v");
+      if (start + max_vis < total_items) mvprintw(3 + max_vis - 1, 25, "v");
     }
 
     int ch = getch();
@@ -1217,10 +1298,21 @@ void entry(struct grid* g, int label, int ch) {
     }
     if (ch == 10 || ch == 13 || ch == KEY_ENTER) {
       if (ac_active && ac_n > 0) {
-        // Accept selected autocomplete: replace trailing alpha with func_name + "("
+        if (ac_range_sel < 0 && ac_range_hint[0]) {
+          // Accept range suggestion: insert range string
+          int rlen = strlen(ac_range_hint);
+          if (n + rlen < MAXIN - 1) {
+            memcpy(buf + n, ac_range_hint, rlen);
+            n += rlen;
+            buf[n] = '\0';
+          }
+          ac_active = 0;
+          ac_clear_popup();
+          continue;
+        }
+        // Accept selected function autocomplete
         const char* fn = func_names[ac_indices[ac_sel]];
         int flen = strlen(fn);
-        // Find the trailing alpha fragment and replace it
         int i = n;
         while (i > 0 && isalpha((unsigned char)buf[i-1])) i--;
         int fraglen = n - i;
@@ -1230,14 +1322,31 @@ void entry(struct grid* g, int label, int ch) {
           n = i + flen + 1;
           buf[n] = '\0';
         }
-        // Record this function in history
         ac_record_usage(ac_indices[ac_sel]);
         ac_active = 0;
         ac_clear_popup();
         // After accepting, update autocomplete for nested context
+        ac_range_hint[0] = '\0';
+        ac_range_sel = 0;
         ac_n = ac_matches(buf, ac_indices, 30);
+        if (ac_n == 0) {
+          ac_suggest_range(g, ac_range_hint, sizeof(ac_range_hint));
+          if (ac_range_hint[0]) ac_range_sel = -1;
+        }
         ac_sel = 0;
-        ac_active = (ac_n > 0);
+        ac_active = (ac_n > 0 || ac_range_hint[0]);
+        continue;
+      }
+      if (ac_active && !ac_n && ac_range_hint[0] && ac_range_sel < 0) {
+        // Only range hint available, accept it
+        int rlen = strlen(ac_range_hint);
+        if (n + rlen < MAXIN - 1) {
+          memcpy(buf + n, ac_range_hint, rlen);
+          n += rlen;
+          buf[n] = '\0';
+        }
+        ac_active = 0;
+        ac_clear_popup();
         continue;
       }
       ac_clear_popup();
@@ -1245,8 +1354,16 @@ void entry(struct grid* g, int label, int ch) {
       if (g->cr < NROW - 1) g->cr++;
       break;
     } else if (ch == 9) {  // Tab: cycle forward through matches
-      if (ac_active && ac_n > 0) {
-        ac_sel = (ac_sel + 1) % ac_n;
+      if (ac_active && (ac_n > 0 || ac_range_hint[0])) {
+        int total = ac_n + (ac_range_hint[0] ? 1 : 0);
+        if (ac_range_sel < 0) {
+          // Currently on range hint, move to first function
+          ac_range_sel = 0;
+          ac_sel = 0;
+        } else {
+          ac_sel = (ac_sel + 1) % ac_n;
+          if (ac_sel == 0) ac_range_sel = -1;  // wrap around to range hint
+        }
         continue;
       }
       ac_clear_popup();
@@ -1256,26 +1373,58 @@ void entry(struct grid* g, int label, int ch) {
     } else if (ch == KEY_BACKSPACE || ch == 127 || ch == 8) {
       if (n > 0) buf[--n] = '\0';
       if (!label) {
+        ac_range_hint[0] = '\0';
+        ac_range_sel = 0;
         ac_n = ac_matches(buf, ac_indices, 30);
+        if (ac_n == 0) {
+          ac_suggest_range(g, ac_range_hint, sizeof(ac_range_hint));
+          if (ac_range_hint[0]) ac_range_sel = -1;
+        }
         ac_sel = 0;
-        ac_active = (ac_n > 0);
+        ac_active = (ac_n > 0 || ac_range_hint[0]);
         if (!ac_active) ac_clear_popup();
       }
     } else if (ch == KEY_UP) {
-      if (ac_active && ac_n > 0) {
-        ac_sel = (ac_sel > 0) ? ac_sel - 1 : ac_n - 1;
+      if (ac_active && (ac_n > 0 || ac_range_hint[0])) {
+        int total = ac_n + (ac_range_hint[0] ? 1 : 0);
+        if (ac_range_sel < 0) {
+          // On range hint, wrap to last function
+          ac_range_sel = 0;
+          ac_sel = ac_n > 0 ? ac_n - 1 : 0;
+        } else if (ac_sel > 0) {
+          ac_sel--;
+        } else {
+          // Move to range hint
+          ac_range_sel = -1;
+        }
       }
     } else if (ch == KEY_DOWN) {
-      if (ac_active && ac_n > 0) {
-        ac_sel = (ac_sel + 1) % ac_n;
+      if (ac_active && (ac_n > 0 || ac_range_hint[0])) {
+        int total = ac_n + (ac_range_hint[0] ? 1 : 0);
+        if (ac_range_sel < 0) {
+          // Move to first function
+          ac_range_sel = 0;
+          ac_sel = 0;
+        } else if (ac_sel < ac_n - 1) {
+          ac_sel++;
+        } else {
+          // Wrap around to range hint
+          ac_range_sel = -1;
+        }
       }
     } else if (n < MAXIN - 1) {
       buf[n++] = ch;
       buf[n] = '\0';
       if (!label) {
+        ac_range_hint[0] = '\0';
+        ac_range_sel = 0;
         ac_n = ac_matches(buf, ac_indices, 30);
+        if (ac_n == 0) {
+          ac_suggest_range(g, ac_range_hint, sizeof(ac_range_hint));
+          if (ac_range_hint[0]) ac_range_sel = -1;
+        }
         ac_sel = 0;
-        ac_active = (ac_n > 0);
+        ac_active = (ac_n > 0 || ac_range_hint[0]);
         if (!ac_active) ac_clear_popup();
       }
     }

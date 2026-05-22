@@ -1059,6 +1059,73 @@ void test_parsedate(void) {
   assert(parsedate("", &s) == 0);
 }
 
+void test_date_arithmetic(void) {
+  static struct grid g = {0};
+
+  // Set A1 as a date (March 15, 2024) with 'T' format
+  float serial = (float)days_from_epoch(2024, 3, 15);
+  g.cells[0][0].type = NUM;
+  g.cells[0][0].val = serial;
+  g.cells[0][0].fmt = 'T';
+
+  // Set A2 as a formula referencing A1 + 7 days
+  setcell(&g, 0, 1, "+A1+7");
+  recalc(&g);
+
+  // A2 should have a value 7 greater than A1
+  assert(fabs(g.cells[0][1].val - (serial + 7.0f)) < 0.1f);
+
+  // A2 should have inherited the date format from A1
+  assert(g.cells[0][1].fmt == 'T' || g.cells[0][1].fmt == 'U' || g.cells[0][1].fmt == 'u');
+
+  // Test with subtraction: A1 - 5
+  memset(&g, 0, sizeof(g));
+  g.cells[0][0].type = NUM;
+  g.cells[0][0].val = serial;
+  g.cells[0][0].fmt = 'T';
+  setcell(&g, 0, 1, "+A1-5");
+  recalc(&g);
+  assert(fabs(g.cells[0][1].val - (serial - 5.0f)) < 0.1f);
+  assert(g.cells[0][1].fmt == 'T' || g.cells[0][1].fmt == 'U' || g.cells[0][1].fmt == 'u');
+
+  // A formula referencing a date-formatted cell should inherit that format
+  memset(&g, 0, sizeof(g));
+  setcell(&g, 0, 0, "42");
+  g.cells[1][0].type = NUM;
+  g.cells[1][0].val = 100.0f;
+  g.cells[1][0].fmt = 'T';
+  setcell(&g, 0, 1, "+B1");  // A2 references B1 (which has date fmt)
+  recalc(&g);
+  // A2 should inherit date format from B1 since it references a date cell
+  assert(g.cells[0][1].fmt == 'T');
+}
+
+void test_duration_format(void) {
+  static struct grid g = {0};
+
+  // Set a cell with a time serial (36 hours = 1.5 days)
+  setcell(&g, 0, 0, "1.5");
+  g.cells[0][0].fmt = 'S';
+
+  // Verify the value is correct
+  assert(fabs(g.cells[0][0].val - 1.5f) < 0.001f);
+
+  // 12 hours = 0.5 days
+  setcell(&g, 1, 0, "0.5");
+  g.cells[1][0].fmt = 'S';
+  assert(fabs(g.cells[1][0].val - 0.5f) < 0.001f);
+
+  // 0 hours (midnight)
+  setcell(&g, 2, 0, "0");
+  g.cells[2][0].fmt = 'S';
+  assert(g.cells[2][0].val == 0.0f);
+
+  // Non-numeric cell with 'S' format shouldn't crash
+  setcell(&g, 3, 0, "hello");
+  g.cells[3][0].fmt = 'S';
+  assert(g.cells[3][0].type == LABEL);
+}
+
 void test_autofill(void) {
   static struct grid g = {0};
 
@@ -1253,5 +1320,7 @@ int main(void) {
   test_autofill();
   test_date_functions();
   test_parsedate();
+  test_date_arithmetic();
+  test_duration_format();
   return 0;
 }

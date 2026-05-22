@@ -307,6 +307,26 @@ void recalc(struct grid* g) {
           cl->strval[0] = '\0';
           cl->is_str = 0;
         }
+
+      // Propagate date format from referenced cells to formula cells
+      // (e.g., A1+7 where A1 is a date serial)
+      if (cl->type == FORMULA && cl->fmt != 'T' && cl->fmt != 'U' && cl->fmt != 'u') {
+        const char* s_ = cl->text;
+        while (*s_) {
+          int rc, rr;
+          int n_ = ref(s_, &rc, &rr);
+          if (n_) {
+            struct cell* rcl = cell(g, rc, rr);
+            if (rcl && (rcl->fmt == 'T' || rcl->fmt == 'U' || rcl->fmt == 'u')) {
+              cl->fmt = rcl->fmt;
+              break;
+            }
+            s_ += n_;
+          } else {
+            s_++;
+          }
+        }
+      }
       }
     if (!changed) break;
   }

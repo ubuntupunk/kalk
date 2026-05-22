@@ -60,10 +60,10 @@ Progress tracking for making kalk more like Google Sheets.
 - [x] **Time component in dates** — show `HH:MM` alongside dates; store fractional days for time
 - [x] **More date functions** — `YEAR()`, `MONTH()`, `DAY()`, `HOUR()`, `MINUTE()`, `SECOND()`, `WEEKDAY()`, `DATEDIF()`
 - [x] **Auto-detect date input** — when the user types "2024-01-15" or "1/15/2024", auto-set format to `'T'`
-- [ ] **Date arithmetic** — adding days to a date (e.g. `A1+7` shifts a date by 7 days)
+- [x] **Date arithmetic** — adding days to a date (e.g. `A1+7` shifts a date by 7 days)
 - [x] **Custom date formats** — `YYYY-MM-DD`, `MM/DD/YYYY`, `DD-Mon-YYYY`, etc.
 - [x] **Date picker popup** — a mini calendar UI to pick a date when in date-formatted cell
-- [ ] **Duration/time formatting** — `HH:MM:SS` display, time arithmetic
+- [x] **Duration/time formatting** — `HH:MM:SS` display via `/F S` format
 
 ### Phase 8: Formula Autocomplete Enhancements
 
@@ -71,7 +71,7 @@ Progress tracking for making kalk more like Google Sheets.
 - [x] **Argument hints** — show expected arguments for the selected function (e.g. `SUM(number1, [number2], ...)`)
 - [x] **Function description tooltip** — brief description of what the function does
 - [x] **Fuzzy matching** — match partial function names (e.g. "rou" matches ROUND, ROUNDUP, ROUNDDOWN)
-- [ ] **Cell range autocomplete** — suggest recent or adjacent cell ranges after typing `SUM(`
+- [x] **Cell range autocomplete** — suggest adjacent cell ranges after typing `SUM(`
 - [x] **History-based suggestions** — rank recently used functions higher
 - [x] **Multi-line popup with scrolling** — if many matches, allow scrolling through them
 
