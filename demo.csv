@@ -1,0 +1,37 @@
+Item,Qty,Price,Total,Notes
+Apples,10,0.50,=B2*C2,Fresh fruit
+Bananas,5,0.75,=B3*C3,Fresh fruit
+Oranges,8,0.60,=B4*C4,Fresh fruit
+Milk,2,3.50,=B5*C5,Dairy
+Bread,1,4.99,=B6*C6,Bakery
+Eggs,12,0.25,=B7*C7,Protein
+,,,,
+# SUMMARY,,,,
+Total Items,=SUM(B2:B7),,,,
+Avg Price,=AVERAGE(C2:C7),,,,
+Most Expensive,=MAX(D2:D7),,,,
+Cheapest,=MIN(D2:D7),,,,
+Grand Total,=SUM(D2:D7),,,,
+Items >5,"=COUNTIF(B2:B7,>5)",,,,
+,,,,
+# TEXT FUNCTIONS,,,,
+Upper Case,=UPPER(A2),Lower Case,=LOWER(A2),Length,=LEN(A2)
+Trimmed,"=TRIM(""  hello  "")",Concatenated,"=CONCATENATE(A2,"" - "",B2,"" pcs"")",
+Substring,"=LEFT(A2,3)",Nested,=LEN(UPPER(A2)),,
+,,,,
+# DATE FUNCTIONS,,,,
+Start Date,2024-01-15,2024-06-15,,,
+Days Between,"=DATEDIF(B23,C23,""D"")",Months,"=DATEDIF(B23,C23,""M"")",,
+Today,=TODAY(),Weekday (Mon=1),"=WEEKDAY(B25,2)",,
+Year,=YEAR(B25),Month,=MONTH(B25),Day,=DAY(B25),
+Plus 7 Days,=B23+7,,,
+,,,,
+# CONDITIONALS & LOOKUPS,,,,
+Item > $2,"=IF(C2>2,""Yes"",""No"")",,,
+Bulk Discount,"=IF(B2>5,C2*0.9,C2)",,,
+,,,,
+ID,Name,Price,,,
+101,Widget A,4.99,,,
+102,Widget B,2.50,,,
+103,Widget C,12.00,,,
+Find ID 102,"=VLOOKUP(102,A34:C36,3)",,,

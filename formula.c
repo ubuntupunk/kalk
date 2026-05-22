@@ -182,7 +182,7 @@ float cmp(struct parser* p) {
 }
 
 // Helper: read raw condition text between current position and next ',' or ')'
-// into a buffer, advance p->p past it.
+// into a buffer, advance p->p past it. Strips surrounding quotes and whitespace.
 static int read_cond_text(struct parser* p, char* buf, int bufsz) {
   const char* start = p->p;
   while (*p->p && *p->p != ',' && *p->p != ')') p->p++;
@@ -190,7 +190,14 @@ static int read_cond_text(struct parser* p, char* buf, int bufsz) {
   if (len >= bufsz) len = bufsz - 1;
   memcpy(buf, start, len);
   buf[len] = '\0';
-  return len > 0;
+  // Strip surrounding quotes and whitespace
+  char* s = buf;
+  while (*s == '"' || isspace((unsigned char)*s)) s++;
+  int nlen = strlen(s);
+  while (nlen > 0 && (s[nlen-1] == '"' || isspace((unsigned char)s[nlen-1]))) nlen--;
+  if (s != buf) memmove(buf, s, nlen);
+  buf[nlen] = '\0';
+  return nlen > 0;
 }
 
 // Helper: parse a range from current position, advance p->p past it.
@@ -416,12 +423,35 @@ float func(struct parser* p) {
       p->p++;
       skipws(p);
       float tval = cmp(p);
+      char tstr[MAXIN];
+      strncpy(tstr, p->arg_str, MAXIN - 1);
+      tstr[MAXIN - 1] = '\0';
+      // Clear parser state before false branch to prevent leakage
+      p->arg_str[0] = '\0';
+      p->has_str_result = 0;
       skipws(p);
       if (*p->p != ',') return NAN;
       p->p++;
       skipws(p);
       float fval = cmp(p);
-      result = (cond != 0.0f && !isnan(cond)) ? tval : fval;
+      char fstr[MAXIN];
+      strncpy(fstr, p->arg_str, MAXIN - 1);
+      fstr[MAXIN - 1] = '\0';
+      int cond_true = (cond != 0.0f && !isnan(cond));
+      result = cond_true ? tval : fval;
+      if (cond_true && tstr[0]) {
+        strncpy(p->arg_str, tstr, MAXIN - 1);
+        p->has_str_result = 1;
+      } else if (!cond_true && (p->has_str_result || fstr[0])) {
+        strncpy(p->arg_str, fstr, MAXIN - 1);
+        p->has_str_result = 1;
+      } else {
+        p->has_str_result = 0;
+      }
+      skipws(p);
+      if (*p->p != ')') return NAN;
+      p->p++;
+      return result;
 
     // --- Text functions ---
     } else if (strcmp(fn, "LEN") == 0) {

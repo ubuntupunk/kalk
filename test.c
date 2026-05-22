@@ -142,6 +142,52 @@ void test_expr(void) {
   // zero and edge cases
   assert(EXPR("IF(0, 1, 0))") == 0.0f);
   assert(EXPR("IF(1, 0, 1))") == 0.0f);
+  // IF with string results (true branch)
+  {
+    p.arg_str[0] = '\0'; p.has_str_result = 0;
+    assert(isnan(EXPR("IF(1, \"yes\", \"no\"))")));  // NAN (string)
+    assert(p.has_str_result == 1);
+    assert(strcmp(p.arg_str, "yes") == 0);
+  }
+  // IF with string results (false branch)
+  {
+    p.arg_str[0] = '\0'; p.has_str_result = 0;
+    assert(isnan(EXPR("IF(0, \"yes\", \"no\"))")));
+    assert(p.has_str_result == 1);
+    assert(strcmp(p.arg_str, "no") == 0);
+  }
+  // IF with mixed string/numeric (false branch numeric)
+  {
+    p.arg_str[0] = '\0'; p.has_str_result = 0;
+    assert(EXPR("IF(0, \"yes\", 42))") == 42.0f);
+    assert(p.has_str_result == 0);  // numeric result
+  }
+  // IF with mixed string/numeric (true branch string)
+  {
+    p.arg_str[0] = '\0'; p.has_str_result = 0;
+    assert(isnan(EXPR("IF(1, \"hello\", 99))")));
+    assert(p.has_str_result == 1);
+    assert(strcmp(p.arg_str, "hello") == 0);
+  }
+  // IF with cell references to string cells
+  // A5 = LABEL "hello", A6 = LABEL "world"
+  // NOTE: LABEL cell values are 0 (not NAN), so IF returns 0 with arg_str set
+  setcell(&g, 0, 4, "hello");
+  setcell(&g, 0, 5, "world");
+  {
+    p.arg_str[0] = '\0'; p.has_str_result = 0;
+    float r = EXPR("IF(1, A5, A6))");
+    assert(r == 0.0f);  // LABEL val=0, but arg_str holds the string
+    assert(p.has_str_result == 1);
+    assert(strcmp(p.arg_str, "hello") == 0);
+  }
+  {
+    p.arg_str[0] = '\0'; p.has_str_result = 0;
+    float r = EXPR("IF(0, A5, A6))");
+    assert(r == 0.0f);
+    assert(p.has_str_result == 1);
+    assert(strcmp(p.arg_str, "world") == 0);
+  }
   // Math functions: PI, RAND, POWER, MOD, RANDBETWEEN, SIN, COS, TAN, LOG
   assert(EXPR("PI()") > 3.14159f && EXPR("PI()") < 3.14160f);
   {
@@ -195,6 +241,17 @@ void test_expr(void) {
   assert(EXPR("COUNTIF(A1:A3, >=5))") == 2.0f); // A2+A3
   assert(EXPR("COUNTIF(A1:A3, <>3))") == 2.0f); // A2+A3
   assert(EXPR("COUNTIF(A1:A4, <=0))") == 1.0f); // A4<=0
+  // COUNTIF with quoted condition text (CSV-style with surrounding quotes)
+  // The read_cond_text fix strips surrounding quotes and whitespace
+  assert(EXPR("COUNTIF(A1:A3, \">=5\"))") == 2.0f); // A2+A3 >=5 → 2
+  assert(EXPR("COUNTIF(A1:A4, \"<0\"))") == 1.0f);  // A4<0 → 1
+  assert(EXPR("COUNTIF(A1:A3, \">0\"))") == 3.0f);  // all >0 → 3
+  // COUNTIF with quoted condition and whitespace
+  assert(EXPR("COUNTIF(A1:A3, \" >=5 \"))") == 2.0f);
+  assert(EXPR("COUNTIF(A1:A3, \" =3 \"))") == 1.0f);
+  // SUMIF with quoted condition
+  assert(EXPR("SUMIF(A1:A3, \">=5\"))") == 16.0f); // A2+A3 → 16
+  assert(EXPR("SUMIF(A1:A3, \" <5 \"))") == 3.0f);  // A1<5 → 3, with whitespace
 
   // --- Phase 2: VLOOKUP/HLOOKUP ---
   // VLOOKUP(key, range, col_index): search first col for key, return from indexed col

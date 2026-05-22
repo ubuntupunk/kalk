@@ -7,12 +7,14 @@ A minimal spreadsheet for the terminal. No dependencies beyond ncurses.
     $ kalk budget.csv
 
 Inspired by VisiCalc and mostly compatible with it. Reads and writes CSV.
-Supports formulas with cell references, 35+ functions (including text
-functions like LEN, UPPER, CONCATENATE), cell formatting with colors and
-bold/italic text, conditional formatting, row/column operations,
-data sorting, cell replication with relative reference adjustment, and
-frozen titles. Supports both traditional (`@SUM(A1...A4)`) and Google
-Sheets-style (`=SUM(A1:A4)`) syntax.
+Supports formulas with cell references, 47 functions (including text
+functions like LEN, UPPER, CONCATENATE, date/time functions like DATE,
+DATEDIF, WEEKDAY), cell formatting with colors and bold/italic text,
+conditional formatting, row/column operations, data sorting, cell
+replication with relative reference adjustment, frozen titles,
+multi-sheet support with cross-sheet references, undo/redo (Ctrl+Z/Y),
+and formula autocomplete with fuzzy matching. Supports both traditional
+(`@SUM(A1...A4)`) and Google Sheets-style (`=SUM(A1:A4)`) syntax.
 
 This is the Power Sheets version, if you want the simple VisiCalc version,
 it can be found [here](https://github.com/zserge/kalk).
@@ -48,11 +50,12 @@ Press `/` for commands:
     /DR /DC       Delete row/column
     /E            Sheet explorer (list all sheets, pick by number)
     /IR /IC       Insert row/column
-    /F_           Format cell (L R I G D $ % * T)
+    /F_           Format cell (L R I G D $ % * T U u t S)
     /FC           Set foreground color (0=blk 1=Red 2=Grn 3=Yel 4=Blu 5=Mag 6=Cyn 7=Wht)
     /FB           Set background color (same 0-7 palette)
     /FO           Set text attribute (0=none 1=Bold 2=Italic 3=Both)
     /FN           Set conditional format rule (e.g. >5, <0, =10, <>7)
+    /FP           Date picker popup (mini calendar)
     /FX           Clear all cell colors/attributes/condition
     /GC           Set column width
     /GF_          Set global format
@@ -85,10 +88,13 @@ Other keys:
     !           Force recalculation
     "           Enter label
     Backspace   Clear cell
-    Tab         Next column
-    Enter       Next row
+    Tab         Next column / cycle autocomplete suggestions
+    Enter       Next row / accept autocomplete suggestion
+    Up/Down     Navigate autocomplete suggestions
     Home        Jump to A1
     Ctrl-C      Quit
+    Ctrl-Z      Undo
+    Ctrl-Y      Redo
 
 ## Formulas
 
@@ -146,6 +152,17 @@ The two syntaxes are fully compatible and can be mixed.
 | `COS`           | Cosine (radians)                                        | `=COS(A1)`                      |
 | `TAN`           | Tangent (radians)                                       | `=TAN(A1)`                      |
 | `LOG`           | Natural logarithm                                       | `=LOG(A1)`                      |
+| `DATE`          | Create date from year, month, day                       | `=DATE(2024, 1, 15)`            |
+| `TODAY`         | Current date                                            | `=TODAY()`                      |
+| `NOW`           | Current date and time                                   | `=NOW()`                        |
+| `YEAR`          | Extract year from a date serial                         | `=YEAR(A1)`                     |
+| `MONTH`         | Extract month (1-12) from a date serial                 | `=MONTH(A1)`                    |
+| `DAY`           | Extract day of month (1-31) from a date serial          | `=DAY(A1)`                      |
+| `HOUR`          | Extract hour (0-23) from a date serial                  | `=HOUR(A1)`                     |
+| `MINUTE`        | Extract minute (0-59) from a date serial                | `=MINUTE(A1)`                   |
+| `SECOND`        | Extract second (0-59) from a date serial                | `=SECOND(A1)`                   |
+| `WEEKDAY`       | Day of week (1=Sun..7=Sat); optional type arg           | `=WEEKDAY(A1, 2)`               |
+| `DATEDIF`       | Difference between dates ("Y"/"M"/"D"/"MD"/"YM"/"YD") | `=DATEDIF(A1, A2, "D")`         |
 
 String arguments can be cell references (A1), string literals (`"hello"`),
 or expressions. Functions that return strings (UPPER, LOWER, TRIM, LEFT,
@@ -197,6 +214,43 @@ Comparisons have lower precedence than arithmetic, so `A1+B2>10` parses as
 Cell references adjust automatically on replicate, insert, and delete.
 Use `$` for absolute references: `$A$1` (fixed), `$A1` (fixed column),
 `A$1` (fixed row).
+
+### Date/time system
+
+Date serials are days since 1970-01-01. Typing a date like `2024-01-15`
+or `1/15/2024` auto-detects the format and stores a serial number.
+Date arithmetic works naturally: `=A1+7` on a date cell shifts it by 7
+days. Use `/F P` to open a date picker popup for visual selection.
+
+Cell formats for date/time display:
+- `T` — YYYY-MM-DD (includes time if present)
+- `U` — MM/DD/YYYY
+- `u` — DD-Mon-YYYY (e.g. 15-Jan-2024)
+- `t` — HH:MM:SS (time only)
+- `S` — HH:MM:SS (duration, e.g. 1.5 displays as 36:00:00)
+
+### Formula autocomplete
+
+While typing a formula, a popup shows matching function names with
+fuzzy matching (e.g. "rou" matches ROUND, ROUNDUP, ROUNDDOWN).
+Use Tab or Up/Down to cycle, Enter to accept. The popup shows each
+function's signature (argument hints) and description. Recently used
+functions appear higher. Adjacent cell ranges are also suggested.
+
+### Undo / Redo
+
+Press Ctrl+Z to undo the last operation (cell edit, insert/delete row/col,
+sort, paste, cut, replicate, autofill, format change, etc.). Press Ctrl+Y
+to redo. Redo is invalidated after a new edit. 100 undo levels are stored
+with up to 4096 cells per entry.
+
+### Auto-fill patterns
+
+The `/A` command detects and extends several pattern types from seed cells:
+- **Linear arithmetic**: 1, 2, 3 → 4, 5, 6... or 10, 20, 30 → 40, 50...
+- **Day names**: Mon, Tue, Wed... or Monday, Tuesday...
+- **Month names**: Jan, Feb, Mar... or January, February...
+- **Copy/tile**: any other pattern repeats the seed cells cyclically
 
 ## License
 

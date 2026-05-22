@@ -47,4 +47,19 @@ uninstall:
 clean:
 	rm -f kalk testkalk *.o
 
-.PHONY: all kalk test install uninstall clean
+demo: kalk
+	@echo "Opening demo spreadsheet... Press Ctrl+C to quit."
+	./kalk demo.csv
+
+demo-cast: kalk
+	@echo "Recording asciinema demo..."
+	@echo ""
+	@echo "Available commands (during recording):"
+	@echo "  Ctrl+D or 'exit'  - Finish recording"
+	@echo "  Ctrl+Z            - Undo"
+	@echo "  Ctrl+Y            - Redo"
+	@echo "  /                 - Command mode"
+	@echo ""
+	asciinema rec kalk-demo.cast -c "./kalk demo.csv"
+
+.PHONY: all kalk test install uninstall clean demo demo-cast

@@ -7,10 +7,12 @@ kalk \- a terminal spreadsheet with colors, formulas, and sorting
 .SH DESCRIPTION
 .B kalk
 is a minimal VisiCalc-inspired spreadsheet for the terminal.
-It reads and writes CSV files and supports formulas with 30+ functions,
+It reads and writes CSV files and supports formulas with 47 functions,
 cell colors (foreground and background), bold/italic text, conditional
 formatting, row/column operations, data sorting, cell replication with
-relative reference adjustment, and frozen title rows/columns.
+relative reference adjustment, frozen title rows/columns,
+multi-sheet support with cross-sheet references, undo/redo,
+and formula autocomplete.
 .PP
 Supports both traditional (@SUM(A1...A4)) and Google Sheets-style
 (=SUM(A1:A4)) formula syntax. Multi-argument functions, SUMIF/COUNTIF
@@ -45,6 +47,18 @@ Clear current cell
 .TP
 .B !
 Force recalculation
+.TP
+.B Ctrl+Z
+Undo last operation (also available in command mode)
+.TP
+.B Ctrl+Y
+Redo last undo (also available in command mode)
+.TP
+.B Ctrl+C
+Quit
+.TP
+.B Tab / Up / Down
+Navigate autocomplete suggestions while typing formulas
 .SH FORMULAS
 .PP
 Formulas support arithmetic operators (+, \-, *, /), comparison operators
@@ -121,6 +135,54 @@ RIGHT, MID, CONCATENATE) produce a string cell value. Functions that accept
 strings (LEN, FIND) also accept numeric values (converted automatically).
 Text functions can be nested: LEN(UPPER(A1)) returns the length of the
 uppercased value of A1.
+.SS Date/time functions
+.TP
+.B @DATE(year, month, day)
+Create a date serial from year, month, and day values
+.TP
+.B @TODAY()
+Current date as a serial number
+.TP
+.B @NOW()
+Current date and time as a serial number
+.TP
+.B @YEAR(serial)
+Extract year from a date serial
+.TP
+.B @MONTH(serial)
+Extract month (1-12) from a date serial
+.TP
+.B @DAY(serial)
+Extract day of month (1-31) from a date serial
+.TP
+.B @HOUR(serial)
+Extract hour (0-23) from a date serial
+.TP
+.B @MINUTE(serial)
+Extract minute (0-59) from a date serial
+.TP
+.B @SECOND(serial)
+Extract second (0-59) from a date serial
+.TP
+.B @WEEKDAY(serial, [type])
+Day of week. type=1 (default): Sun=1..Sat=7, type=2: Mon=1..Sun=7,
+type=3: Mon=0..Sun=6
+.TP
+.B @DATEDIF(start, end, unit)
+Difference between dates. Units: "Y" (years), "M" (months),
+"D" (days), "MD" (days ignoring months), "YM" (months ignoring years),
+"YD" (days ignoring years)
+.PP
+Date serials are days since 1970-01-01. When you type a date like
+2024-01-15 or 1/15/2024, kalk auto-detects it and stores the serial
+with format set to 'T'. Date arithmetic works naturally: A1+7 on a
+date cell shifts it by 7 days. The date picker popup (/F P) provides
+a visual calendar for selecting dates.
+.PP
+Cell formats for date/time display:
+T = YYYY-MM-DD (with time if present), U = MM/DD/YYYY,
+u = DD-Mon-YYYY, t = HH:MM:SS (time only),
+S = HH:MM:SS (duration from serial, e.g. 1.5 -> 36:00:00)
 .SS Math and utility functions
 .TP
 .B @IF(cond, tval, fval)
@@ -223,7 +285,8 @@ Insert row or column at cursor
 .TP
 .B /F \fIformat\fR
 Set cell format: L(eft) R(ight) I(nteger) G(eneral) D(efault)
-$(dollar) %(percent) *(bar graph)
+$(dollar) %(percent) *(bar graph) T(date) U(US date)
+u(DD-Mon-YYYY) t(time) S(duration HH:MM:SS)
 .TP
 .B /F C
 Set foreground color (0=blk, 1=Red, 2=Grn, 3=Yel, 4=Blu, 5=Mag,
@@ -242,6 +305,11 @@ The cell is colored with its assigned color only when the rule matches.
 .B /F X
 Clear all cell formatting: foreground/background color, text attribute,
 and conditional format rule
+.TP
+.B /F P
+Date picker popup - a mini calendar to visually select a date.
+Use arrow keys to navigate, Tab to switch field (day/month/year),
+Enter to select, Esc to cancel.
 .TP
 .B /GC
 Set global column width (4\-20)
@@ -322,6 +390,21 @@ Sheet names are matched case-insensitively.
 .PP
 Copy/paste between sheets: yank or cut cells from one sheet, navigate
 (/N, /P, or /E) to another sheet, and paste with /V.
+.SS Formula autocomplete
+.PP
+While typing a formula in entry mode, kalk shows a popup with matching
+function names. Use
+.B Tab
+or
+.B Up/Down
+arrows to cycle through suggestions,
+.B Enter
+to accept. The popup shows the function signature (argument hints)
+and a description of what the function does. Fuzzy matching allows
+typing partial names like "rou" to match ROUND, ROUNDUP, and ROUNDDOWN.
+Recently used functions are ranked higher in the suggestions.
+Adjacent cell ranges are also suggested (e.g. when typing SUM(,
+kalk suggests nearby data ranges).
 .SH FILES
 .PP
 kalk reads and writes standard CSV files. Formulas are stored as entered
