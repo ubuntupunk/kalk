@@ -1033,89 +1033,254 @@ void nav(struct grid* g) {
   }
 }
 
-// Compute autocomplete matches for a buffer (only pure-alpha buffers match functions)
-static int ac_matches(const char* buf, int* indices, int max) {
-  int n = 0, len = 0;
-  while (buf[len] && isalpha(buf[len])) len++;
-  if (len < 1 || buf[len] != '\0') return 0;  // must be pure alpha
-  for (int i = 0; func_names[i] && n < max; i++) {
-    const char* f = func_names[i];
-    int match = 1;
-    for (int j = 0; j < len; j++)
-      if (toupper(f[j]) != toupper(buf[j])) { match = 0; break; }
-    if (match && f[len]) indices[n++] = i;
+// --- Autocomplete helpers ---
+
+// Find the trailing alpha fragment in a buffer for nested autocomplete.
+// E.g., "SUM(A1, S" -> "S", "IF(A1>5,A" -> "A"
+// Returns fragment length, 0 if none.
+static int ac_find_fragment(const char* buf, char* frag, int fragsz) {
+  int len = strlen(buf);
+  if (len < 1) return 0;
+  // Find last continuous alpha sequence at end of buffer
+  int i = len;
+  while (i > 0 && isalpha((unsigned char)buf[i-1])) i--;
+  int flen = len - i;
+  if (flen < 1 || flen >= fragsz) return 0;
+  for (int j = 0; j < flen; j++) frag[j] = toupper((unsigned char)buf[i+j]);
+  frag[flen] = '\0';
+  return flen;
+}
+
+// Fuzzy match: check if all chars in query appear in order in target.
+// E.g., "rou" matches both "ROUND" and "ROUNDUP".
+static int fuzzy_match(const char* query, const char* target) {
+  while (*query) {
+    while (*target && toupper((unsigned char)*target) != (unsigned char)*query) target++;
+    if (!*target) return 0;
+    query++;
+    target++;
   }
-  return n;
+  return 1;
+}
+
+// Match score: 0=none, 1=prefix, 2=fuzzy
+static int ac_match_score(const char* query, const char* func) {
+  int qlen = strlen(query);
+  // Prefix match
+  int match = 1;
+  for (int i = 0; i < qlen; i++)
+    if (toupper((unsigned char)func[i]) != (unsigned char)query[i]) { match = 0; break; }
+  if (match) return 1;
+  // Fuzzy match (subsequence)
+  return fuzzy_match(query, func) ? 2 : 0;
+}
+
+// History rank: 0 = most recent, -1 = not in history
+static int ac_history_rank(int idx) {
+  for (int i = 0; i < func_history_count; i++)
+    if (func_history[i] == idx) return i;
+  return -1;
+}
+
+// Record a function as used (bring to front of history)
+static void ac_record_usage(int idx) {
+  int found = -1;
+  for (int i = 0; i < func_history_count; i++) {
+    if (func_history[i] == idx) { found = i; break; }
+  }
+  if (found >= 0) {
+    for (int i = found; i > 0; i--) func_history[i] = func_history[i-1];
+  } else {
+    if (func_history_count < FUNC_HISTORY_MAX) func_history_count++;
+    for (int i = func_history_count - 1; i > 0; i--) func_history[i] = func_history[i-1];
+  }
+  func_history[0] = idx;
+}
+
+// Clear popup area (lines 2-10)
+static void ac_clear_popup(void) {
+  for (int r = 2; r <= 10; r++) {
+    move(r, 2);
+    clrtoeol();
+  }
+}
+
+// Compute autocomplete matches with nested context + fuzzy matching + history ranking
+static int ac_matches(const char* buf, int* indices, int max) {
+  char frag[32];
+  if (!ac_find_fragment(buf, frag, sizeof(frag))) return 0;
+  
+  int qlen = strlen(frag);
+  if (qlen < 1) return 0;
+  
+  // Score all functions, collect matches
+  int scores[NFUNCS];
+  int idxbuf[NFUNCS];
+  int n = 0;
+  for (int i = 0; func_names[i]; i++) {
+    int sc = ac_match_score(frag, func_names[i]);
+    if (sc > 0) {
+      // Apply history boost: recently used functions get higher priority
+      int hrank = ac_history_rank(i);
+      if (hrank >= 0 && sc == 2) sc = 1;  // fuzzy match + in history -> treat as prefix
+      scores[n] = sc;
+      idxbuf[n] = i;
+      n++;
+    }
+  }
+  
+  // Sort: prefix matches first, then fuzzy; within each group, history rank (most recent first)
+  for (int i = 0; i < n - 1; i++) {
+    for (int j = i + 1; j < n; j++) {
+      int swap = 0;
+      if (scores[j] < scores[i]) swap = 1;
+      else if (scores[j] == scores[i]) {
+        int hi = ac_history_rank(idxbuf[i]);
+        int hj = ac_history_rank(idxbuf[j]);
+        if (hi < 0) hi = 9999;
+        if (hj < 0) hj = 9999;
+        if (hj < hi) swap = 1;
+      }
+      if (swap) {
+        int ts = scores[i]; scores[i] = scores[j]; scores[j] = ts;
+        int ti = idxbuf[i]; idxbuf[i] = idxbuf[j]; idxbuf[j] = ti;
+      }
+    }
+  }
+  
+  // Copy to output (limit to max)
+  int out_n = n < max ? n : max;
+  for (int i = 0; i < out_n; i++) indices[i] = idxbuf[i];
+  return out_n;
 }
 
 // entry mode: edit cell content, label mode if label=1 or ch is non-formula starter
 void entry(struct grid* g, int label, int ch) {
   char buf[MAXIN] = {0};
-  int n = 0, ac_sel = 0, ac_n = 0, ac_indices[20];
+  int n = 0, ac_sel = 0, ac_n = 0, ac_indices[30];
+  int ac_active = 0;  // 1 if popup is being shown
   draw(g, "ENTRY", "");
-  if (ch) {
+  if (ch && !label) {
     buf[n++] = ch;
     buf[n] = '\0';
-    ac_n = ac_matches(buf, ac_indices, 20);
+    ac_n = ac_matches(buf, ac_indices, 30);
     ac_sel = 0;
+    ac_active = (ac_n > 0);
   }
   for (;;) {
     mvprintw(1, 0, "> %s_", buf);
     clrtoeol();
-    // Draw autocomplete popup on line 2 (over column headers)
-    if (ac_n > 0) {
+    // Draw autocomplete popup
+    if (ac_active && ac_n > 0) {
+      int max_vis = 7;  // max visible items at once
+      int start = ac_sel - max_vis / 2;
+      if (start < 0) start = 0;
+      if (start + max_vis > ac_n) start = ac_n - max_vis;
+      if (start < 0) start = 0;
+
+      // Line 2: Argument hint (sig of currently selected function)
       move(2, 2);
       clrtoeol();
-      int max_show = ac_n < 10 ? ac_n : 10;
-      for (int i = 0; i < max_show; i++) {
-        if (i == ac_sel) attron(A_REVERSE);
-        mvprintw(2, 2 + i * (CW + 1), "%*s", CW, func_names[ac_indices[i]]);
-        if (i == ac_sel) attroff(A_REVERSE);
+      int sel_idx = ac_indices[ac_sel];
+      attron(A_BOLD);
+      mvprintw(2, 2, "%s", func_sigs[sel_idx]);
+      attroff(A_BOLD);
+
+      // Lines 3-9: Function names, one per line
+      int disp = 0;
+      for (int i = start; i < ac_n && disp < max_vis; i++, disp++) {
+        int row = 3 + disp;
+        move(row, 2);
+        clrtoeol();
+        int idx = ac_indices[i];
+        int is_cur = (i == ac_sel);
+        if (is_cur) attron(A_REVERSE);
+        // Prefix hint: show first letters of match in bold
+        mvprintw(row, 2, "%-20s", func_names[idx]);
+        if (is_cur) attroff(A_REVERSE);
       }
+
+      // Line 10: Description of selected function
+      move(10, 2);
+      clrtoeol();
+      mvprintw(10, 2, "%s", func_descs[sel_idx]);
+
+      // Scroll indicator if there are more items
+      if (start > 0) mvprintw(3, 25, "^");
+      if (start + max_vis < ac_n) mvprintw(3 + max_vis - 1, 25, "v");
     }
+
     int ch = getch();
     if (ch == 27) {
-      if (ac_n > 0) { ac_n = 0; continue; }  // dismiss popup
+      if (ac_active) { ac_active = 0; ac_clear_popup(); continue; }
       break;
     }
     if (ch == 10 || ch == 13 || ch == KEY_ENTER) {
-      if (ac_n > 0) {
-        // Accept selected autocomplete: replace with func_name + "("
+      if (ac_active && ac_n > 0) {
+        // Accept selected autocomplete: replace trailing alpha with func_name + "("
         const char* fn = func_names[ac_indices[ac_sel]];
         int flen = strlen(fn);
-        int plen = 0;
-        while (plen < n && isalpha(buf[plen])) plen++;
-        if (plen > 0) {
-          memcpy(buf, fn, flen);
-          buf[flen] = '(';
-          n = flen + 1;
+        // Find the trailing alpha fragment and replace it
+        int i = n;
+        while (i > 0 && isalpha((unsigned char)buf[i-1])) i--;
+        int fraglen = n - i;
+        if (fraglen > 0 && flen + 1 < MAXIN - (int)sizeof(buf) + i) {
+          memcpy(buf + i, fn, flen);
+          buf[i + flen] = '(';
+          n = i + flen + 1;
           buf[n] = '\0';
         }
-        ac_n = 0;
+        // Record this function in history
+        ac_record_usage(ac_indices[ac_sel]);
+        ac_active = 0;
+        ac_clear_popup();
+        // After accepting, update autocomplete for nested context
+        ac_n = ac_matches(buf, ac_indices, 30);
+        ac_sel = 0;
+        ac_active = (ac_n > 0);
         continue;
       }
+      ac_clear_popup();
       setcell(g, g->cc, g->cr, buf);
       if (g->cr < NROW - 1) g->cr++;
       break;
-    } else if (ch == 9) {
-      if (ac_n > 0) {
+    } else if (ch == 9) {  // Tab: cycle forward through matches
+      if (ac_active && ac_n > 0) {
         ac_sel = (ac_sel + 1) % ac_n;
         continue;
       }
+      ac_clear_popup();
       setcell(g, g->cc, g->cr, buf);
       if (g->cc < NCOL - 1) g->cc++;
       break;
     } else if (ch == KEY_BACKSPACE || ch == 127 || ch == 8) {
       if (n > 0) buf[--n] = '\0';
-      ac_n = ac_matches(buf, ac_indices, 20);
-      ac_sel = 0;
+      if (!label) {
+        ac_n = ac_matches(buf, ac_indices, 30);
+        ac_sel = 0;
+        ac_active = (ac_n > 0);
+        if (!ac_active) ac_clear_popup();
+      }
+    } else if (ch == KEY_UP) {
+      if (ac_active && ac_n > 0) {
+        ac_sel = (ac_sel > 0) ? ac_sel - 1 : ac_n - 1;
+      }
+    } else if (ch == KEY_DOWN) {
+      if (ac_active && ac_n > 0) {
+        ac_sel = (ac_sel + 1) % ac_n;
+      }
     } else if (n < MAXIN - 1) {
       buf[n++] = ch;
       buf[n] = '\0';
-      ac_n = ac_matches(buf, ac_indices, 20);
-      ac_sel = 0;
+      if (!label) {
+        ac_n = ac_matches(buf, ac_indices, 30);
+        ac_sel = 0;
+        ac_active = (ac_n > 0);
+        if (!ac_active) ac_clear_popup();
+      }
     }
   }
+  ac_clear_popup();
 }
 
 void loop(void) {

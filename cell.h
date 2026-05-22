@@ -39,6 +39,15 @@ struct parser {
 #define NFUNCS 48
 extern const char* const func_names[];
 
+// Function signatures and descriptions (indexed same as func_names, entry 0..NFUNCS-2)
+extern const char* const func_sigs[];
+extern const char* const func_descs[];
+
+// Function usage history (recently used function indices, most recent first)
+#define FUNC_HISTORY_MAX 20
+extern int func_history[FUNC_HISTORY_MAX];
+extern int func_history_count;
+
 // Cell operations
 struct cell* cell(struct grid* g, int c, int r);
 void setcell(struct grid* g, int c, int r, const char* input);

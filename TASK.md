@@ -67,13 +67,13 @@ Progress tracking for making kalk more like Google Sheets.
 
 ### Phase 8: Formula Autocomplete Enhancements
 
-- [ ] **Nested autocomplete** — show suggestions for functions inside expressions: `IF(ISBLANK(A1), SUM(`
-- [ ] **Argument hints** — show expected arguments for the selected function (e.g. `SUM(number1, [number2], ...)`)
-- [ ] **Function description tooltip** — brief description of what the function does
-- [ ] **Fuzzy matching** — match partial function names (e.g. "rou" matches ROUND, ROUNDUP, ROUNDDOWN)
+- [x] **Nested autocomplete** — show suggestions for functions inside expressions: `IF(ISBLANK(A1), SUM(`
+- [x] **Argument hints** — show expected arguments for the selected function (e.g. `SUM(number1, [number2], ...)`)
+- [x] **Function description tooltip** — brief description of what the function does
+- [x] **Fuzzy matching** — match partial function names (e.g. "rou" matches ROUND, ROUNDUP, ROUNDDOWN)
 - [ ] **Cell range autocomplete** — suggest recent or adjacent cell ranges after typing `SUM(`
-- [ ] **History-based suggestions** — rank recently used functions higher
-- [ ] **Multi-line popup with scrolling** — if many matches, allow scrolling through them
+- [x] **History-based suggestions** — rank recently used functions higher
+- [x] **Multi-line popup with scrolling** — if many matches, allow scrolling through them
 
 ---
 

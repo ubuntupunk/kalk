@@ -23,6 +23,112 @@ const char* const func_names[] = {
     NULL
 };
 
+// Function signatures (Google Sheets style argument hints)
+const char* const func_sigs[] = {
+    "ABS(value)",                                              // ABS
+    "AVERAGE(number1, [number2], ...)",                       // AVERAGE
+    "CEILING(value, [factor])",                               // CEILING
+    "CONCATENATE(string1, [string2], ...)",                   // CONCATENATE
+    "COS(angle)",                                             // COS
+    "COUNT(value1, [value2], ...)",                           // COUNT
+    "COUNTIF(range, condition)",                              // COUNTIF
+    "DATE(year, month, day)",                                 // DATE
+    "DATEDIF(start_date, end_date, unit)",                    // DATEDIF
+    "DAY(date)",                                              // DAY
+    "FIND(search_for, text_to_search, [start_at])",           // FIND
+    "FLOOR(value, [factor])",                                 // FLOOR
+    "HLOOKUP(key, range, row_index, [is_sorted])",            // HLOOKUP
+    "HOUR(serial_number)",                                    // HOUR
+    "IF(logical_test, value_if_true, value_if_false)",        // IF
+    "INT(value)",                                             // INT
+    "LEFT(string, [num_chars])",                              // LEFT
+    "LEN(text)",                                              // LEN
+    "LOG(value, [base])",                                     // LOG
+    "LOWER(text)",                                            // LOWER
+    "MAX(value1, [value2], ...)",                             // MAX
+    "MID(string, start, [num_chars])",                        // MID
+    "MIN(value1, [value2], ...)",                             // MIN
+    "MINUTE(serial_number)",                                  // MINUTE
+    "MOD(dividend, divisor)",                                 // MOD
+    "MONTH(serial_number)",                                   // MONTH
+    "NOW()",                                                  // NOW
+    "PI()",                                                   // PI
+    "POWER(base, exponent)",                                  // POWER
+    "RAND()",                                                 // RAND
+    "RANDBETWEEN(low, high)",                                 // RANDBETWEEN
+    "RIGHT(string, [num_chars])",                             // RIGHT
+    "ROUND(value, [places])",                                 // ROUND
+    "ROUNDDOWN(value, [places])",                             // ROUNDDOWN
+    "ROUNDUP(value, [places])",                               // ROUNDUP
+    "SECOND(serial_number)",                                  // SECOND
+    "SIN(angle)",                                             // SIN
+    "SQRT(value)",                                            // SQRT
+    "SUM(number1, [number2], ...)",                           // SUM
+    "SUMIF(range, condition, [sum_range])",                   // SUMIF
+    "TAN(angle)",                                             // TAN
+    "TODAY()",                                                // TODAY
+    "TRIM(text)",                                             // TRIM
+    "UPPER(text)",                                            // UPPER
+    "VLOOKUP(key, range, col_index, [is_sorted])",            // VLOOKUP
+    "WEEKDAY(serial_number, [type])",                         // WEEKDAY
+    "YEAR(serial_number)",                                    // YEAR
+};
+
+// Function descriptions
+const char* const func_descs[] = {
+    "Returns the absolute value of a number",                              // ABS
+    "Returns the numeric average of a list",                               // AVERAGE
+    "Rounds a number up to the nearest multiple",                          // CEILING
+    "Concatenates multiple strings together",                              // CONCATENATE
+    "Returns the cosine of an angle",                                      // COS
+    "Counts the number of numeric values in a list",                       // COUNT
+    "Counts cells in a range that match a condition",                      // COUNTIF
+    "Creates a date from year, month, and day values",                     // DATE
+    "Calculates the difference between two dates",                         // DATEDIF
+    "Returns the day of the month (1-31)",                                 // DAY
+    "Returns the position of a string within another",                     // FIND
+    "Rounds a number down to the nearest multiple",                        // FLOOR
+    "Looks up a key horizontally in a table",                              // HLOOKUP
+    "Returns the hour component of a time",                                // HOUR
+    "Returns one value if true, another if false",                         // IF
+    "Rounds a number down to the nearest integer",                         // INT
+    "Returns the leftmost characters from a string",                       // LEFT
+    "Returns the length of a string",                                      // LEN
+    "Returns the logarithm of a value",                                    // LOG
+    "Converts text to lowercase",                                          // LOWER
+    "Returns the maximum value in a list",                                 // MAX
+    "Returns a substring starting at a given position",                    // MID
+    "Returns the minimum value in a list",                                 // MIN
+    "Returns the minute component of a time",                              // MINUTE
+    "Returns the remainder after division",                                // MOD
+    "Returns the month from a date serial",                                // MONTH
+    "Returns the current date and time",                                   // NOW
+    "Returns the value of pi (3.14159)",                                   // PI
+    "Returns a number raised to a power",                                  // POWER
+    "Returns a random number between 0 and 1",                             // RAND
+    "Returns a random integer between two values",                         // RANDBETWEEN
+    "Returns the rightmost characters from a string",                      // RIGHT
+    "Rounds a number to a specified precision",                            // ROUND
+    "Rounds a number down toward zero",                                   // ROUNDDOWN
+    "Rounds a number up away from zero",                                   // ROUNDUP
+    "Returns the second component of a time",                              // SECOND
+    "Returns the sine of an angle",                                        // SIN
+    "Returns the square root of a number",                                 // SQRT
+    "Sums a list of numbers",                                              // SUM
+    "Sums cells in a range that match a condition",                        // SUMIF
+    "Returns the tangent of an angle",                                     // TAN
+    "Returns the current date",                                            // TODAY
+    "Removes leading and trailing whitespace from text",                   // TRIM
+    "Converts text to uppercase",                                          // UPPER
+    "Looks up a key vertically in a table",                                // VLOOKUP
+    "Returns the day of the week (1-7)",                                   // WEEKDAY
+    "Returns the year from a date serial",                                 // YEAR
+};
+
+// Function usage history (recently used function indices, most recent first)
+int func_history[FUNC_HISTORY_MAX];
+int func_history_count = 0;
+
 // Multi-sheet support
 struct grid* sheets[MAXSHEETS];
 int cur_sheet = 0;
