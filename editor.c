@@ -6,9 +6,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 static int vcols(void) { return (COLS - GW) / CW > 0 ? (COLS - GW) / CW : 1; }
-static int vrows(void) { return (LINES - 4) > 0 ? (LINES - 4) : 1; }
+static int vrows(void) { return (LINES - 5) > 0 ? (LINES - 5) : 1; }
 
 static void fmtcell(struct grid* g, struct cell* cl, char* fb, int cw) {
   if (!cl || cl->type == EMPTY) {
@@ -27,6 +28,12 @@ static void fmtcell(struct grid* g, struct cell* cl, char* fb, int cw) {
       snprintf(t, sizeof(t), "%.2f", cl->val);
     } else if (fmt == '%') {
       snprintf(t, sizeof(t), "%.2f%%", cl->val * 100);
+    } else if (fmt == 'T') {
+      time_t t_ = (time_t)(cl->val * 86400);
+      struct tm* tm_ = localtime(&t_);
+      if (tm_) strftime(t, sizeof(t), "%Y-%m-%d", tm_);
+      else snprintf(t, sizeof(t), "%g", cl->val);
+      fmt = 'L';
     } else if (fmt == '*') {
       for (int i = 0; i < cw && i < cl->val; i++) t[i] = '*';
       fmt = 'L';
@@ -153,6 +160,15 @@ static void draw(struct grid* g, const char* mode, const char* buf) {
       if (pair_id) attroff(COLOR_PAIR(pair_id));
       if (cell_attr) attroff(cell_attr);
     }
+  }
+
+  // Tab bar (sheet names)
+  move(LINES - 1, 0);
+  clrtoeol();
+  for (int i = 0; i < n_sheets; i++) {
+    if (i == cur_sheet) attron(A_REVERSE);
+    mvprintw(LINES - 1, i * 12, " %s ", sheet_names[i]);
+    if (i == cur_sheet) attroff(A_REVERSE);
   }
 }
 
@@ -359,10 +375,58 @@ void replcmd(struct grid* g) {
   }
 }
 
+void autofillcmd(struct grid* g) {
+  mvprintw(1, 0, "Auto-fill: (D)own or (R)ight?    "), clrtoeol();
+  int dir = toupper(getch());
+  if (dir != 'D' && dir != 'R') return;
+
+  mvprintw(1, 0, "Count: "), clrtoeol();
+  char cbuf[8] = {0};
+  int cn = 0;
+  for (;;) {
+    mvprintw(1, 7, "%s_", cbuf);
+    int k = getch();
+    if (k == 27) return;
+    if (k == 10 || k == 13 || k == KEY_ENTER) break;
+    else if (k == KEY_BACKSPACE || k == 127 || k == 8) {
+      if (cn > 0) cbuf[--cn] = '\0';
+    } else if (isdigit(k) && cn < (int)sizeof(cbuf) - 2) {
+      cbuf[cn++] = k;
+      cbuf[cn] = '\0';
+    }
+  }
+  int count = (cn > 0) ? atoi(cbuf) : 0;
+  if (count <= 0) return;
+
+  // Detect seed range from cells above (down) or left (right) of current cursor
+  int seed_n = 0;
+  int max_seed = 16;
+  if (dir == 'D') {
+    for (int r = g->cr - 1; r >= 0 && seed_n < max_seed; r--) {
+      struct cell* cl = cell(g, g->cc, r);
+      if (!cl || cl->type == EMPTY) break;
+      seed_n++;
+    }
+    if (seed_n < 1) return;
+    autofill(g, g->cc, g->cr - seed_n, seed_n, count, 0);
+  } else {
+    for (int c = g->cc - 1; c >= 0 && seed_n < max_seed; c--) {
+      struct cell* cl = cell(g, c, g->cr);
+      if (!cl || cl->type == EMPTY) break;
+      seed_n++;
+    }
+    if (seed_n < 1) return;
+    autofill(g, g->cc - seed_n, g->cr, seed_n, count, 1);
+  }
+  recalc(g);
+  g->dirty = 1;
+}
+
 //
+//  /A                   Auto-fill pattern (linear, date names, or copy)
 //  /B                   Blank current cell value (keep formatting)
 //  /C                   Clear entire spreadsheet (keep formatting)
-//  /F(L/R/I/G/D/$/%/*)  Set cell format: Left/Right/Integer/General/Dollar/Percent
+//  /F(L/R/I/G/D/$/%/*/T) Set cell format: Left/Right/Integer/General/Dollar/Percent/Date
 //  /DR, /DC             Delete row/column
 //  /IR, /IC             Insert row/column
 //  /GC                  Set column width
@@ -373,11 +437,14 @@ void replcmd(struct grid* g) {
 //  /SS                  Save CSV file
 //  /SQ                  Save and quit
 //  /T(V/H/B/N)          Lock rows/columns
+//  /N                   Next sheet
+//  /P                   Previous sheet
+//  /W(N/R/D)            Sheet: New/Rename/Delete
 //  /Q                   Quit (prompts if unsaved)
 //
 int command(struct grid* g) {
   draw(g, "CMD", "");
-  mvprintw(1, 0, "Command: B C F D I G M R S T Q"), clrtoeol();
+  mvprintw(1, 0, "Command: B C F D I G M R S T A N P W Q"), clrtoeol();
   refresh();
   int ch = toupper(getch());
   if (ch == 'B') {  // blank current cell
@@ -408,10 +475,10 @@ int command(struct grid* g) {
       insertcol(g, g->cc);
     recalc(g);
   } else if (ch == 'F') {  // change cell format/color/condition
-    mvprintw(1, 0, "Fmt: L R I G D $ %% * | Fg(C) | (B)g | Attr(O) | (N)cond | (X)clear"), clrtoeol();
+    mvprintw(1, 0, "Fmt: L R I G D $ %% * T | Fg(C) | (B)g | Attr(O) | (N)cond | (X)clear"), clrtoeol();
     ch = toupper(getch());
     struct cell* cl = cell(g, g->cc, g->cr);
-    if (strchr("LRIGD$%*", ch)) cl->fmt = ch;
+    if (strchr("LRIGD$%*T", ch)) cl->fmt = ch;
     else if (ch == 'C') {
       mvprintw(1, 0, "Fg: 0=blk 1=Red 2=Grn 3=Yel 4=Blu 5=Mag 6=Cyn 7=Wht"), clrtoeol();
       ch = toupper(getch());
@@ -480,6 +547,64 @@ int command(struct grid* g) {
       mvprintw(1, 0, "Format: L R I G D $ %% *"), clrtoeol();
       ch = toupper(getch());
       if (strchr("LRIGD$%*", ch)) g->fmt = ch;
+    }
+  } else if (ch == 'A') {
+    autofillcmd(g);
+  } else if (ch == 'N') {  // next sheet
+    if (cur_sheet < n_sheets - 1) cur_sheet++;
+    recalc(curgrid());
+  } else if (ch == 'P') {  // previous sheet
+    if (cur_sheet > 0) cur_sheet--;
+    recalc(curgrid());
+  } else if (ch == 'W') {  // worksheet management
+    mvprintw(1, 0, "Sheet: N(e)w (R)ename (D)elete?"), clrtoeol();
+    ch = toupper(getch());
+    if (ch == 'E') {  // New
+      char nbuf[32] = {0};
+      int nn = 0;
+      snprintf(nbuf, sizeof(nbuf), "Sheet%d", n_sheets + 1);
+      nn = strlen(nbuf);
+      mvprintw(1, 0, "New sheet name: %s_", nbuf), clrtoeol();
+      for (;;) {
+        mvprintw(1, 16, "%s_", nbuf);
+        int k = getch();
+        if (k == 27) break;
+        if (k == 10 || k == 13 || k == KEY_ENTER) {
+          newsheet(nbuf);
+          cur_sheet = n_sheets - 1;
+          break;
+        } else if (k == KEY_BACKSPACE || k == 127 || k == 8) {
+          if (nn > 0) nbuf[--nn] = '\0';
+        } else if (nn < (int)sizeof(nbuf) - 2 && k >= 32) {
+          nbuf[nn++] = k;
+          nbuf[nn] = '\0';
+        }
+      }
+    } else if (ch == 'R') {  // Rename
+      mvprintw(1, 0, "Rename to: "), clrtoeol();
+      char nbuf[32] = {0};
+      int nn = 0;
+      strncpy(nbuf, sheet_names[cur_sheet], sizeof(nbuf) - 1);
+      nn = strlen(nbuf);
+      for (;;) {
+        mvprintw(1, 11, "%s_", nbuf);
+        int k = getch();
+        if (k == 27) break;
+        if (k == 10 || k == 13 || k == KEY_ENTER) {
+          renamesheet(cur_sheet, nbuf);
+          break;
+        } else if (k == KEY_BACKSPACE || k == 127 || k == 8) {
+          if (nn > 0) nbuf[--nn] = '\0';
+        } else if (nn < (int)sizeof(nbuf) - 2 && k >= 32) {
+          nbuf[nn++] = k;
+          nbuf[nn] = '\0';
+        }
+      }
+    } else if (ch == 'D') {  // Delete
+      if (n_sheets > 1) {
+        delsheet();
+        recalc(curgrid());
+      }
     }
   } else if (ch == 'M') {
     movecmd(g);
@@ -639,36 +764,94 @@ void nav(struct grid* g) {
   }
 }
 
+// Compute autocomplete matches for a buffer (only pure-alpha buffers match functions)
+static int ac_matches(const char* buf, int* indices, int max) {
+  int n = 0, len = 0;
+  while (buf[len] && isalpha(buf[len])) len++;
+  if (len < 1 || buf[len] != '\0') return 0;  // must be pure alpha
+  for (int i = 0; func_names[i] && n < max; i++) {
+    const char* f = func_names[i];
+    int match = 1;
+    for (int j = 0; j < len; j++)
+      if (toupper(f[j]) != toupper(buf[j])) { match = 0; break; }
+    if (match && f[len]) indices[n++] = i;
+  }
+  return n;
+}
+
 // entry mode: edit cell content, label mode if label=1 or ch is non-formula starter
 void entry(struct grid* g, int label, int ch) {
   char buf[MAXIN] = {0};
-  int n = 0;
+  int n = 0, ac_sel = 0, ac_n = 0, ac_indices[20];
   draw(g, "ENTRY", "");
-  if (ch) buf[n++] = ch;
+  if (ch) {
+    buf[n++] = ch;
+    buf[n] = '\0';
+    ac_n = ac_matches(buf, ac_indices, 20);
+    ac_sel = 0;
+  }
   for (;;) {
     mvprintw(1, 0, "> %s_", buf);
     clrtoeol();
+    // Draw autocomplete popup on line 2 (over column headers)
+    if (ac_n > 0) {
+      move(2, 2);
+      clrtoeol();
+      int max_show = ac_n < 10 ? ac_n : 10;
+      for (int i = 0; i < max_show; i++) {
+        if (i == ac_sel) attron(A_REVERSE);
+        mvprintw(2, 2 + i * (CW + 1), "%*s", CW, func_names[ac_indices[i]]);
+        if (i == ac_sel) attroff(A_REVERSE);
+      }
+    }
     int ch = getch();
-    if (ch == 27) break;
+    if (ch == 27) {
+      if (ac_n > 0) { ac_n = 0; continue; }  // dismiss popup
+      break;
+    }
     if (ch == 10 || ch == 13 || ch == KEY_ENTER) {
+      if (ac_n > 0) {
+        // Accept selected autocomplete: replace with func_name + "("
+        const char* fn = func_names[ac_indices[ac_sel]];
+        int flen = strlen(fn);
+        int plen = 0;
+        while (plen < n && isalpha(buf[plen])) plen++;
+        if (plen > 0) {
+          memcpy(buf, fn, flen);
+          buf[flen] = '(';
+          n = flen + 1;
+          buf[n] = '\0';
+        }
+        ac_n = 0;
+        continue;
+      }
       setcell(g, g->cc, g->cr, buf);
       if (g->cr < NROW - 1) g->cr++;
       break;
     } else if (ch == 9) {
+      if (ac_n > 0) {
+        ac_sel = (ac_sel + 1) % ac_n;
+        continue;
+      }
       setcell(g, g->cc, g->cr, buf);
       if (g->cc < NCOL - 1) g->cc++;
       break;
     } else if (ch == KEY_BACKSPACE || ch == 127 || ch == 8) {
       if (n > 0) buf[--n] = '\0';
+      ac_n = ac_matches(buf, ac_indices, 20);
+      ac_sel = 0;
     } else if (n < MAXIN - 1) {
       buf[n++] = ch;
       buf[n] = '\0';
+      ac_n = ac_matches(buf, ac_indices, 20);
+      ac_sel = 0;
     }
   }
 }
 
-void loop(struct grid* g) {
+void loop(void) {
   for (;;) {
+    struct grid* g = curgrid();
     int lc = g->tc;
     int lr = g->tr;
     int fc = vcols() - lc;

@@ -6,17 +6,19 @@
 #include <string.h>
 
 int main(int argc, char* argv[]) {
-  static struct grid g = {0};
   if (argc == 2 && (strcmp(argv[1], "-h") == 0 || strcmp(argv[1], "--help") == 0)) {
     fprintf(stderr, "Usage: %s sheet.csv\n", argv[0]);
     exit(1);
   }
+  // Initialize multi-sheet system
+  init_sheets();
+
   if (argc > 1) {
-    if (csvload(&g, argv[1]) < 0) {
+    if (csvload(sheets[0], argv[1]) < 0) {
       perror("Failed to load CSV file");
       exit(1);
     }
-    g.filename = argv[1];
+    sheets[0]->filename = argv[1];
   }
   initscr();
   raw();
@@ -32,7 +34,7 @@ int main(int argc, char* argv[]) {
         if (fg > 0 || bg > 0)  // skip pair 0 (unused default)
           init_pair(fg * 8 + bg, cmap[fg], cmap[bg]);
   }
-  loop(&g);
+  loop();
   endwin();
   return 0;
 }

@@ -957,6 +957,132 @@ void test_text_functions(void) {
 #undef EXPR
 }
 
+void test_autofill(void) {
+  static struct grid g = {0};
+
+  // Simple linear numeric fill down
+  setcell(&g, 0, 0, "1");
+  setcell(&g, 0, 1, "2");
+  autofill(&g, 0, 0, 2, 3, 0);  // fill 3 cells down from seed A1=1, A2=2
+  recalc(&g);
+  assert(g.cells[0][2].type == NUM);
+  assert(g.cells[0][2].val == 3.0f);
+  assert(g.cells[0][3].val == 4.0f);
+  assert(g.cells[0][4].val == 5.0f);
+
+  // Linear numeric fill right
+  memset(&g, 0, sizeof(g));
+  setcell(&g, 0, 0, "10");
+  setcell(&g, 1, 0, "20");
+  autofill(&g, 0, 0, 2, 3, 1);  // fill 3 cells right from seed A1=10, B1=20
+  recalc(&g);
+  assert(g.cells[2][0].val == 30.0f);
+  assert(g.cells[3][0].val == 40.0f);
+  assert(g.cells[4][0].val == 50.0f);
+
+  // Custom step: 5, 10 → 15, 20
+  memset(&g, 0, sizeof(g));
+  setcell(&g, 0, 0, "5");
+  setcell(&g, 0, 1, "10");
+  autofill(&g, 0, 0, 2, 2, 0);
+  recalc(&g);
+  assert(g.cells[0][2].val == 15.0f);
+  assert(g.cells[0][3].val == 20.0f);
+
+  // Negative step: 10, 5 → 0, -5
+  memset(&g, 0, sizeof(g));
+  setcell(&g, 0, 0, "10");
+  setcell(&g, 0, 1, "5");
+  autofill(&g, 0, 0, 2, 2, 0);
+  recalc(&g);
+  assert(g.cells[0][2].val == 0.0f);
+  assert(g.cells[0][3].val == -5.0f);
+
+  // Day names (short): Mon, Tue → Wed, Thu, Fri
+  memset(&g, 0, sizeof(g));
+  setcell(&g, 0, 0, "Mon");
+  setcell(&g, 0, 1, "Tue");
+  autofill(&g, 0, 0, 2, 3, 0);
+  recalc(&g);
+  assert(strcmp(g.cells[0][2].text, "WED") == 0);
+  assert(strcmp(g.cells[0][3].text, "THU") == 0);
+  assert(strcmp(g.cells[0][4].text, "FRI") == 0);
+
+  // Day names wrap around: Fri, Sat → Sun, Mon, Tue
+  memset(&g, 0, sizeof(g));
+  setcell(&g, 0, 0, "Fri");
+  setcell(&g, 0, 1, "Sat");
+  autofill(&g, 0, 0, 2, 3, 0);
+  recalc(&g);
+  assert(strcmp(g.cells[0][2].text, "SUN") == 0);
+  assert(strcmp(g.cells[0][3].text, "MON") == 0);
+  assert(strcmp(g.cells[0][4].text, "TUE") == 0);
+
+  // Full day names
+  memset(&g, 0, sizeof(g));
+  setcell(&g, 0, 0, "Monday");
+  setcell(&g, 0, 1, "Tuesday");
+  autofill(&g, 0, 0, 2, 2, 0);
+  recalc(&g);
+  assert(strcmp(g.cells[0][2].text, "WEDNESDAY") == 0);
+  assert(strcmp(g.cells[0][3].text, "THURSDAY") == 0);
+
+  // Month names (short): Jan, Feb → Mar, Apr
+  memset(&g, 0, sizeof(g));
+  setcell(&g, 0, 0, "Jan");
+  setcell(&g, 0, 1, "Feb");
+  autofill(&g, 0, 0, 2, 3, 0);
+  recalc(&g);
+  assert(strcmp(g.cells[0][2].text, "MAR") == 0);
+  assert(strcmp(g.cells[0][3].text, "APR") == 0);
+  assert(strcmp(g.cells[0][4].text, "MAY") == 0);
+
+  // Full month names
+  memset(&g, 0, sizeof(g));
+  setcell(&g, 0, 0, "January");
+  setcell(&g, 0, 1, "February");
+  autofill(&g, 0, 0, 2, 2, 0);
+  recalc(&g);
+  assert(strcmp(g.cells[0][2].text, "MARCH") == 0);
+  assert(strcmp(g.cells[0][3].text, "APRIL") == 0);
+
+  // Single seed cell → copy/tile
+  memset(&g, 0, sizeof(g));
+  setcell(&g, 0, 0, "42");
+  autofill(&g, 0, 0, 1, 3, 0);
+  recalc(&g);
+  assert(g.cells[0][1].val == 42.0f);
+  assert(g.cells[0][2].val == 42.0f);
+  assert(g.cells[0][3].val == 42.0f);
+
+  // Tiling with 2 seed cells (non-linear values just copy)
+  memset(&g, 0, sizeof(g));
+  setcell(&g, 0, 0, "10");
+  setcell(&g, 0, 1, "20");
+  autofill(&g, 0, 0, 2, 3, 0);  // wait, this has step=10 so it extends linearly! Not tiling
+  // Let's test with same values (step=0)
+  memset(&g, 0, sizeof(g));
+  setcell(&g, 0, 0, "hello");
+  setcell(&g, 0, 1, "world");
+  autofill(&g, 0, 0, 2, 4, 0);
+  recalc(&g);
+  // Non-numeric, non-date: tiles
+  assert(strcmp(g.cells[0][2].text, "hello") == 0);
+  assert(strcmp(g.cells[0][3].text, "world") == 0);
+  assert(strcmp(g.cells[0][4].text, "hello") == 0);
+  assert(strcmp(g.cells[0][5].text, "world") == 0);
+
+  // Step 0 (all same value) → fill with same value
+  memset(&g, 0, sizeof(g));
+  setcell(&g, 0, 0, "7");
+  setcell(&g, 0, 1, "7");
+  autofill(&g, 0, 0, 2, 3, 0);
+  recalc(&g);
+  assert(g.cells[0][2].val == 7.0f);
+  assert(g.cells[0][3].val == 7.0f);
+  assert(g.cells[0][4].val == 7.0f);
+}
+
 void test_color_cond_fields(void) {
   static struct grid g = {0};
 
@@ -1022,5 +1148,6 @@ int main(void) {
   test_sort_with_refs();
   test_color_cond_fields();
   test_text_functions();
+  test_autofill();
   return 0;
 }

@@ -26,20 +26,54 @@ Progress tracking for making kalk more like Google Sheets.
 
 ### Phase 3: String/type system (foundational)
 
-- [ ] **String cell values** — store strings that can be used in formulas
-- [ ] **Text functions** — `LEN`, `LEFT`, `RIGHT`, `MID`, `UPPER`, `LOWER`, `TRIM`, `FIND`, `CONCATENATE`
+- [x] **String cell values** — store strings that can be used in formulas
+- [x] **Text functions** — `LEN`, `LEFT`, `RIGHT`, `MID`, `UPPER`, `LOWER`, `TRIM`, `FIND`, `CONCATENATE`
 
 ### Phase 4: Data operations
 
 - [x] **Data sorting** — `/O` command to sort rows by a column
-- [ ] **Auto-fill** — replicate patterns (1, 2, 3... or Mon, Tue, Wed...) via `/R`
+- [x] **Auto-fill** — replicate patterns (1, 2, 3... or Mon, Tue, Wed...) via `/A`
 - [x] **Cell colors** — `/F` C set cell color (0-7), `/F` N set conditional formatting rule
 
 ### Phase 5: Polish & UX
 
-- [ ] **Formula autocomplete** — show function suggestions while typing
-- [ ] **Cell formatting: date/time** — display timestamps
-- [ ] **Multi-sheet support** — tabs like Google Sheets workbook
+- [x] **Formula autocomplete** — show function suggestions while typing (`/E` entry mode)
+- [x] **Cell formatting: date/time** — `'T'` format displays dates from serial numbers; `DATE()`, `NOW()`, `TODAY()` functions
+- [x] **Multi-sheet support** — tab bar at bottom, `/N` `/P` next/prev sheet, `/W E` new sheet, `/W R` rename, `/W D` delete
+
+---
+
+## Future phases
+
+### Phase 6: Multi-Sheet Enhancements
+
+- [ ] **Copy/paste across sheets** — replicate cells between different sheets
+- [ ] **Cross-sheet references** — `Sheet2!A1` syntax for formula references to other sheets
+- [ ] **Sheet reordering** — drag/move tabs, swap sheet order
+- [ ] **Sheet colors** — assign a color to each sheet tab
+- [ ] **CSV per sheet** — load/save each sheet to a different CSV file
+- [ ] **Import sheet from CSV** — load a CSV into a new sheet via `/W I`
+- [ ] **Sheet count & navigation popup** — show a list of all sheets (like `Ctrl+PageUp` in Excel)
+
+### Phase 7: Date/Time System
+
+- [ ] **Time component in dates** — show `HH:MM` alongside dates; store fractional days for time
+- [ ] **More date functions** — `YEAR()`, `MONTH()`, `DAY()`, `HOUR()`, `MINUTE()`, `SECOND()`, `WEEKDAY()`, `DATEDIF()`
+- [ ] **Auto-detect date input** — when the user types "2024-01-15" or "1/15/2024", auto-set format to `'T'`
+- [ ] **Date arithmetic** — adding days to a date (e.g. `A1+7` shifts a date by 7 days)
+- [ ] **Custom date formats** — `YYYY-MM-DD`, `MM/DD/YYYY`, `DD-Mon-YYYY`, etc.
+- [ ] **Date picker popup** — a mini calendar UI to pick a date when in date-formatted cell
+- [ ] **Duration/time formatting** — `HH:MM:SS` display, time arithmetic
+
+### Phase 8: Formula Autocomplete Enhancements
+
+- [ ] **Nested autocomplete** — show suggestions for functions inside expressions: `IF(ISBLANK(A1), SUM(`
+- [ ] **Argument hints** — show expected arguments for the selected function (e.g. `SUM(number1, [number2], ...)`)
+- [ ] **Function description tooltip** — brief description of what the function does
+- [ ] **Fuzzy matching** — match partial function names (e.g. "rou" matches ROUND, ROUNDUP, ROUNDDOWN)
+- [ ] **Cell range autocomplete** — suggest recent or adjacent cell ranges after typing `SUM(`
+- [ ] **History-based suggestions** — rank recently used functions higher
+- [ ] **Multi-line popup with scrolling** — if many matches, allow scrolling through them
 
 ---
 

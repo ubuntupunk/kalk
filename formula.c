@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 static void skipws(struct parser* p) { for (; isspace(*p->p); p->p++); }
 
@@ -350,6 +351,10 @@ float func(struct parser* p) {
       result = 3.141592653589793f;
     } else if (strcmp(fn, "RAND") == 0) {
       result = (float)rand() / (float)RAND_MAX;
+    } else if (strcmp(fn, "TODAY") == 0) {
+      result = (float)((double)time(NULL) / 86400.0);
+    } else if (strcmp(fn, "NOW") == 0) {
+      result = (float)((double)time(NULL) / 86400.0);
     } else if (strcmp(fn, "IF") == 0) {
       float cond = cmp(p);
       skipws(p);
@@ -504,10 +509,21 @@ float func(struct parser* p) {
       skipws(p);
       if (*p->p != ')') return NAN;
       p->p++;
-      return NAN;
+      return NAN;    } else if (strcmp(fn, "DATE") == 0) {
+      float y = cmp(p); skipws(p);
+      if (*p->p != ',') return NAN; p->p++; skipws(p);
+      float m = cmp(p); skipws(p);
+      if (*p->p != ',') return NAN; p->p++; skipws(p);
+      float d = cmp(p);
+      struct tm tm = {0};
+      tm.tm_year = (int)y - 1900;
+      tm.tm_mon = (int)m - 1;
+      tm.tm_mday = (int)d;
+      time_t t = mktime(&tm);
+      result = (float)((double)t / 86400.0);
 
-    } else {
-      float arg = cmp(p);
+      } else {
+        float arg = cmp(p);
 
       // Multi-argument aggregating functions: SUM(A1, B1, C1), etc.
       if (strcmp(fn, "SUM") == 0 || strcmp(fn, "AVERAGE") == 0 ||

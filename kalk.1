@@ -202,6 +202,13 @@ Press
 .B /
 to enter command mode. Available commands:
 .TP
+.B /A
+Auto-fill patterns downward or rightward. Choose direction (D/R), then
+the number of cells to fill. Seeds are detected automatically from
+cells above (for down) or left (for right). Supports linear arithmetic
+sequences (1, 2, 3...), day names (Mon, Tue, Wed...), month names
+(Jan, Feb, Mar...), and simple copy/tiling for other values.
+.TP
 .B /B
 Blank current cell (clear value, keep format)
 .TP

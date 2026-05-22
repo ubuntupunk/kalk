@@ -35,6 +35,10 @@ struct parser {
   int has_str_result;   // 1 if current expression produced a string result
 };
 
+// Function name list for autocomplete (null-terminated)
+#define NFUNCS 40
+extern const char* const func_names[];
+
 // Cell operations
 struct cell* cell(struct grid* g, int c, int r);
 void setcell(struct grid* g, int c, int r, const char* input);
@@ -50,6 +54,10 @@ void swapcol(struct grid* g, int a, int b);
 
 // Cell replication
 void replicatecell(struct grid* g, int sc, int sr, int dc, int dr);
+
+// Auto-fill: detect pattern from seed cells and extend
+// fill_right=0 fill down, fill_right=1 fill right
+void autofill(struct grid* g, int seed_c, int seed_r, int seed_n, int count, int fill_right);
 
 // Sorting
 void sortbycol(struct grid* g, int col);
@@ -72,7 +80,7 @@ int csvload(struct grid* g, const char* filename);
 int csvsave(struct grid* g, const char* filename);
 
 // Editor main loop
-void loop(struct grid* g);
+void loop(void);
 
 // Entry mode (called from loop)
 void entry(struct grid* g, int label, int ch);
@@ -86,7 +94,23 @@ void replcmd(struct grid* g);
 // Move command (called from command)
 void movecmd(struct grid* g);
 
+// Auto-fill command (called from command)
+void autofillcmd(struct grid* g);
+
 // Command handler (called from loop)
 int command(struct grid* g);
+
+// Multi-sheet support
+#define MAXSHEETS 26
+#define SHEETNAMELEN 32
+extern struct grid* sheets[MAXSHEETS];
+extern int cur_sheet;
+extern int n_sheets;
+extern char sheet_names[MAXSHEETS][SHEETNAMELEN];
+struct grid* curgrid(void);
+void newsheet(const char* name);
+void delsheet(void);
+void renamesheet(int idx, const char* name);
+void init_sheets(void);
 
 #endif

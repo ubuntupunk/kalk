@@ -42,6 +42,7 @@ start with `+`, `-`, `(`, `@`, or `=`. Anything else is a label.
 
 Press `/` for commands:
 
+    /A            Auto-fill (detect patterns: 1,2,3... or Mon,Tue,Wed...)
     /B            Blank cell
     /C            Clear sheet
     /DR /DC       Delete row/column
