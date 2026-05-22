@@ -262,6 +262,42 @@ Replicate (copy) cells. Select source range (arrow keys or type ref,
 Enter to confirm, Esc to cancel), then pick target location. Formulas
 adjust relative references automatically.
 .TP
+.B /E
+Sheet explorer - show all sheets, type a number to switch
+.TP
+.B /N
+Next sheet
+.TP
+.B /P
+Previous sheet
+.TP
+.B /W E
+New sheet (prompt for name)
+.TP
+.B /W R
+Rename current sheet
+.TP
+.B /W D
+Delete current sheet (cannot delete the last sheet)
+.TP
+.B /W I
+Import CSV file into a new sheet (sheet named after the filename)
+.TP
+.B /W L\fR/\fB R
+Move current sheet tab left or right (reorder tabs)
+.TP
+.B /W C
+Set current sheet tab color (0-7 palette)
+.TP
+.B /Y
+Yank (copy) selected cells to clipboard
+.TP
+.B /X
+Cut selected cells to clipboard (yank + clear)
+.TP
+.B /V
+Paste cells from clipboard
+.TP
 .B /SL
 Load CSV file
 .TP
@@ -277,6 +313,15 @@ Horizontal (freeze rows above cursor), Both, or None
 .TP
 .B /Q
 Quit (prompts if unsaved changes)
+.SS Cross-sheet references
+.PP
+Formulas can reference cells on other sheets using the
+.I SheetName!CellRef
+syntax. For example, `=Sheet2!A1+5` adds 5 to the value of cell A1 on Sheet2.
+Sheet names are matched case-insensitively.
+.PP
+Copy/paste between sheets: yank or cut cells from one sheet, navigate
+(/N, /P, or /E) to another sheet, and paste with /V.
 .SH FILES
 .PP
 kalk reads and writes standard CSV files. Formulas are stored as entered

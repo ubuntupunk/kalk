@@ -103,14 +103,39 @@ int command(struct grid* g);
 // Multi-sheet support
 #define MAXSHEETS 26
 #define SHEETNAMELEN 32
+#define CLIPBOARD_MAX 4096  // max cells in clipboard
+
 extern struct grid* sheets[MAXSHEETS];
 extern int cur_sheet;
 extern int n_sheets;
 extern char sheet_names[MAXSHEETS][SHEETNAMELEN];
+extern int sheet_colors[MAXSHEETS];  // 0=default, 1-7=tab color
+
 struct grid* curgrid(void);
 void newsheet(const char* name);
 void delsheet(void);
 void renamesheet(int idx, const char* name);
 void init_sheets(void);
+void swapsheets(int a, int b);
+void setsheetcolor(int idx, int color);
+int sheetbyname(const char* name);
+
+// Clipboard for cross-sheet copy/paste
+struct clipcell {
+  int type;
+  float val;
+  char text[MAXIN];
+  char strval[MAXIN];
+  int is_str;
+  int fmt, color, bg, attr;
+  char cond[64];
+};
+
+extern struct clipcell clipboard[CLIPBOARD_MAX];
+extern int clip_w, clip_h;  // dimensions of clipboard content (0 if empty)
+
+void yank_cells(struct grid* g, int c1, int r1, int c2, int r2);
+void paste_cells(struct grid* g, int tc, int tr);
+void cut_cells(struct grid* g, int c1, int r1, int c2, int r2);
 
 #endif

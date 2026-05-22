@@ -47,13 +47,13 @@ Progress tracking for making kalk more like Google Sheets.
 
 ### Phase 6: Multi-Sheet Enhancements
 
-- [ ] **Copy/paste across sheets** — replicate cells between different sheets
-- [ ] **Cross-sheet references** — `Sheet2!A1` syntax for formula references to other sheets
-- [ ] **Sheet reordering** — drag/move tabs, swap sheet order
-- [ ] **Sheet colors** — assign a color to each sheet tab
-- [ ] **CSV per sheet** — load/save each sheet to a different CSV file
-- [ ] **Import sheet from CSV** — load a CSV into a new sheet via `/W I`
-- [ ] **Sheet count & navigation popup** — show a list of all sheets (like `Ctrl+PageUp` in Excel)
+- [x] **Copy/paste across sheets** — clipboard-based yank (`/Y`), cut (`/X`), paste (`/V`); works across sheets
+- [x] **Cross-sheet references** — `Sheet2!A1` syntax for formula references to other sheets
+- [x] **Sheet reordering** — `/W L` / `/W R` to move tabs left/right
+- [x] **Sheet colors** — `/W C` to assign a tab color (0-7)
+- [x] **CSV per sheet** — each sheet has its own `filename` field; save/load per sheet
+- [x] **Import sheet from CSV** — `/W I` loads a CSV into a new sheet
+- [x] **Sheet navigation popup** — `/E` shows all sheets with numbered list for quick switching
 
 ### Phase 7: Date/Time System
 

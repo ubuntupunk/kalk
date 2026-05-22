@@ -44,12 +44,57 @@ int ref(const char* s, int* col, int* row) {
 }
 
 static float cellval(struct parser* p) {
-  int c, r, ac, ar, n = refabs(p->p, &c, &r, &ac, &ar);
+  struct grid* saved_g = p->g;
+  
+  // Check if this starts with a sheet name followed by !
+  int c, r, ac, ar;
+  const char* saved_pos = p->p;
+  
+  // Try to parse SheetName! prefix
+  const char* q = p->p;
+  int name_len = 0;
+  while (isalpha(*q) || (*q >= '0' && *q <= '9') || *q == '_') { q++; name_len++; }
+  if (name_len > 0 && *q == '!' && name_len <= SHEETNAMELEN - 1) {
+    const char* after = q + 1;
+    int ac2, ar2;
+    int tmpc, tmpr;
+    int ref_n = refabs(after, &tmpc, &tmpr, &ac2, &ar2);
+    if (ref_n && tmpc >= 0 && tmpc < NCOL && tmpr >= 0 && tmpr < NROW) {
+      char sname[SHEETNAMELEN];
+      int slen = q - p->p;
+      memcpy(sname, p->p, slen);
+      sname[slen] = '\0';
+      int idx = sheetbyname(sname);
+      if (idx >= 0 && idx < MAXSHEETS && sheets[idx]) {
+        p->g = sheets[idx];
+        p->p = after;
+        int n = refabs(p->p, &c, &r, &ac, &ar);
+        if (n) {
+          p->p += n;
+          struct cell* cl = cell(p->g, c, r);
+          p->g = saved_g;
+          if (!cl) { p->arg_str[0] = '\0'; return NAN; }
+          if (cl->type == LABEL) {
+            strncpy(p->arg_str, cl->text, MAXIN - 1);
+          } else if (cl->strval[0]) {
+            strncpy(p->arg_str, cl->strval, MAXIN - 1);
+          } else {
+            p->arg_str[0] = '\0';
+          }
+          return cl->val;
+        }
+        p->g = saved_g;
+      }
+    }
+  }
+  p->p = saved_pos;
+  
+  // Normal same-sheet reference
+  int n = refabs(p->p, &c, &r, &ac, &ar);
   if (!n) return NAN;
   p->p += n;
   struct cell* cl = cell(p->g, c, r);
   if (!cl) { p->arg_str[0] = '\0'; return NAN; }
-  // Set arg_str from cell's string value (side channel for text functions)
   if (cl->type == LABEL) {
     strncpy(p->arg_str, cl->text, MAXIN - 1);
   } else if (cl->strval[0]) {

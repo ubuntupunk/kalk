@@ -166,8 +166,16 @@ static void draw(struct grid* g, const char* mode, const char* buf) {
   move(LINES - 1, 0);
   clrtoeol();
   for (int i = 0; i < n_sheets; i++) {
+    int color = sheet_colors[i];
+    int pair_id = 0;
     if (i == cur_sheet) attron(A_REVERSE);
+    if (color > 0 && color <= 7) {
+      pair_id = color * 8 + 0;
+      if (i == cur_sheet) pair_id = color * 8 + (color > 4 ? 0 : 7);
+      attron(COLOR_PAIR(pair_id));
+    }
     mvprintw(LINES - 1, i * 12, " %s ", sheet_names[i]);
+    if (pair_id) attroff(COLOR_PAIR(pair_id));
     if (i == cur_sheet) attroff(A_REVERSE);
   }
 }
@@ -431,6 +439,7 @@ void autofillcmd(struct grid* g) {
 //  /IR, /IC             Insert row/column
 //  /GC                  Set column width
 //  /GF(L/R/I/G/D/$/%/*) Set default column format
+//  /E                   Sheet explorer (list all sheets)
 //  /M                   Move row/column
 //  /R                   Replicate cell
 //  /SL                  Load CSV file
@@ -439,12 +448,15 @@ void autofillcmd(struct grid* g) {
 //  /T(V/H/B/N)          Lock rows/columns
 //  /N                   Next sheet
 //  /P                   Previous sheet
-//  /W(N/R/D)            Sheet: New/Rename/Delete
+//  /W(E/R/D/I/L/R/C)    Sheet: New/Rename/Delete/Import/MoveL/MoveR/Color
+//  /Y                   Yank (copy) cells to clipboard
+//  /V                   Paste cells from clipboard
+//  /X                   Cut cells to clipboard (yank + clear)
 //  /Q                   Quit (prompts if unsaved)
 //
 int command(struct grid* g) {
   draw(g, "CMD", "");
-  mvprintw(1, 0, "Command: B C F D I G M R S T A N P W Q"), clrtoeol();
+  mvprintw(1, 0, "Command: A B C D E F G I M N P Q R S T V W X Y"), clrtoeol();
   refresh();
   int ch = toupper(getch());
   if (ch == 'B') {  // blank current cell
@@ -521,6 +533,45 @@ int command(struct grid* g) {
         }
       }
     }
+  } else if (ch == 'E') {  // Sheet explorer popup
+    mvprintw(1, 0, "Sheets: "), clrtoeol();
+    for (int i = 0; i < n_sheets; i++) {
+      char marker = (i == cur_sheet) ? '>' : ' ';
+      mvprintw(1, 8 + i * 14, "%c%d.%s", marker, i + 1, sheet_names[i]);
+    }
+    mvprintw(1, 8 + n_sheets * 14, "(pick #, Esc)");
+    clrtoeol();
+    char sbuf[4] = {0};
+    int sn = 0;
+    for (;;) {
+      mvprintw(0, COLS - 12, "SHEET");
+      int k = getch();
+      if (k == 27) break;
+      if (k == 10 || k == 13 || k == KEY_ENTER) {
+        int idx = atoi(sbuf) - 1;
+        if (idx >= 0 && idx < n_sheets) {
+          cur_sheet = idx;
+          recalc(curgrid());
+        }
+        break;
+      } else if (k == KEY_BACKSPACE || k == 127 || k == 8) {
+        if (sn > 0) sbuf[--sn] = '\0';
+      } else if (isdigit(k) && sn < (int)sizeof(sbuf) - 2) {
+        sbuf[sn++] = k;
+        sbuf[sn] = '\0';
+      }
+      // Redraw sheet list with current selection highlighted
+      for (int i = 0; i < n_sheets; i++) {
+        int pick = (sn > 0 && atoi(sbuf) - 1 == i);
+        if (pick) attron(A_REVERSE);
+        mvprintw(1, 8 + i * 14, "%s%2d.%s", i == cur_sheet ? ">" : "", i + 1, sheet_names[i]);
+        clrtoeol();
+        if (pick) attroff(A_REVERSE);
+      }
+      mvprintw(1, 8 + n_sheets * 14, "(pick #, Esc) %s", sbuf);
+      clrtoeol();
+      refresh();
+    }
   } else if (ch == 'G') {  // change global settings
     mvprintw(1, 0, "Global: (C)ol width or (F)mt?"), clrtoeol();
     ch = toupper(getch());
@@ -557,7 +608,7 @@ int command(struct grid* g) {
     if (cur_sheet > 0) cur_sheet--;
     recalc(curgrid());
   } else if (ch == 'W') {  // worksheet management
-    mvprintw(1, 0, "Sheet: N(e)w (R)ename (D)elete?"), clrtoeol();
+    mvprintw(1, 0, "Sheet: N(e)w (R)ename (D)elete (I)mport (L)eft (R)i (C)olor?"), clrtoeol();
     ch = toupper(getch());
     if (ch == 'E') {  // New
       char nbuf[32] = {0};
@@ -605,6 +656,71 @@ int command(struct grid* g) {
         delsheet();
         recalc(curgrid());
       }
+    } else if (ch == 'I') {  // Import from CSV into new sheet
+      mvprintw(1, 0, "Import CSV file: "), clrtoeol();
+      char fbuf[256] = {0};
+      int fn = 0;
+      for (;;) {
+        mvprintw(1, 18, "%s_  ", fbuf);
+        int k = getch();
+        if (k == 27) break;
+        if (k == 10 || k == 13 || k == KEY_ENTER) {
+          if (fn > 0) {
+            char sname[SHEETNAMELEN];
+            const char* base = strrchr(fbuf, '/');
+            base = base ? base + 1 : fbuf;
+            snprintf(sname, SHEETNAMELEN, "%.*s", (int)(strcspn(base, ".")), base);
+            // Clean up name: replace non-alphanumeric with underscore
+            for (int i = 0; sname[i]; i++) if (!isalnum(sname[i]) && sname[i] != '_') sname[i] = '_';
+            if (sname[0] == '\0') snprintf(sname, SHEETNAMELEN, "Sheet%d", n_sheets + 1);
+            newsheet(sname);
+            cur_sheet = n_sheets - 1;
+            struct grid* ng = curgrid();
+            if (csvload(ng, fbuf) == 0) {
+              ng->filename = strdup(fbuf);
+              ng->dirty = 0;
+            } else {
+              // Loading failed, remove the empty sheet
+              delsheet();
+              mvprintw(1, 0, "Failed to load: %s. Press any key.", fbuf), clrtoeol();
+              getch();
+            }
+          }
+          break;
+        } else if (k == KEY_BACKSPACE || k == 127 || k == 8) {
+          if (fn > 0) fbuf[--fn] = '\0';
+        } else if (fn < (int)sizeof(fbuf) - 1 && k >= 32) {
+          fbuf[fn++] = k;
+          fbuf[fn] = '\0';
+        }
+      }
+    } else if (ch == 'L' || ch == 'R') {  // Move tab left/right
+      int dir = (ch == 'L') ? -1 : 1;
+      int new_idx = cur_sheet + dir;
+      if (new_idx >= 0 && new_idx < n_sheets) {
+        swapsheets(cur_sheet, new_idx);
+      }
+    } else if (ch == 'C') {  // Sheet tab color
+      mvprintw(1, 0, "Tab color: 0=blk 1=Red 2=Grn 3=Yel 4=Blu 5=Mag 6=Cyn 7=Wht"), clrtoeol();
+      ch = getch();
+      int col = ch - '0';
+      if (col >= 0 && col <= 7) setsheetcolor(cur_sheet, col);
+    }
+  } else if (ch == 'Y') {  // Yank (copy to clipboard)
+    int sc1, sr1, sc2, sr2;
+    int origc = g->cc, origr = g->cr;
+    if (selectrange(g, "Yank:", origc, origr, &sc1, &sr1, &sc2, &sr2)) {
+      yank_cells(g, sc1, sr1, sc2, sr2);
+    }
+  } else if (ch == 'V') {  // Paste from clipboard
+    if (clip_w > 0 && clip_h > 0) {
+      paste_cells(g, g->cc, g->cr);
+    }
+  } else if (ch == 'X') {  // Cut (yank + clear)
+    int sc1, sr1, sc2, sr2;
+    int origc = g->cc, origr = g->cr;
+    if (selectrange(g, "Cut:", origc, origr, &sc1, &sr1, &sc2, &sr2)) {
+      cut_cells(g, sc1, sr1, sc2, sr2);
     }
   } else if (ch == 'M') {
     movecmd(g);

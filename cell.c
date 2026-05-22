@@ -8,6 +8,9 @@
 
 int CW = 8;  // column display width
 
+// Forward declarations for static helpers used before their definitions
+static int my_strcasecmp(const char* a, const char* b);
+
 // Function name list for autocomplete (alphabetical, NULL-terminated)
 const char* const func_names[] = {
     "ABS", "AVERAGE", "CEILING", "CONCATENATE", "COS", "COUNT", "COUNTIF",
@@ -23,9 +26,13 @@ struct grid* sheets[MAXSHEETS];
 int cur_sheet = 0;
 int n_sheets = 1;
 char sheet_names[MAXSHEETS][SHEETNAMELEN];
+int sheet_colors[MAXSHEETS];
 
 void init_sheets(void) {
-    for (int i = 0; i < MAXSHEETS; i++) sheets[i] = NULL;
+    for (int i = 0; i < MAXSHEETS; i++) {
+        sheets[i] = NULL;
+        sheet_colors[i] = 0;
+    }
     sheets[0] = calloc(1, sizeof(struct grid));
     strncpy(sheet_names[0], "Sheet1", SHEETNAMELEN - 1);
     n_sheets = 1;
@@ -40,6 +47,7 @@ void newsheet(const char* name) {
     if (n_sheets >= MAXSHEETS) return;
     sheets[n_sheets] = calloc(1, sizeof(struct grid));
     strncpy(sheet_names[n_sheets], name, SHEETNAMELEN - 1);
+    sheet_colors[n_sheets] = 0;
     n_sheets++;
 }
 
@@ -54,6 +62,110 @@ void delsheet(void) {
 void renamesheet(int idx, const char* name) {
     if (idx < 0 || idx >= n_sheets) return;
     strncpy(sheet_names[idx], name, SHEETNAMELEN - 1);
+}
+
+void swapsheets(int a, int b) {
+    if (a < 0 || a >= n_sheets || b < 0 || b >= n_sheets || a == b) return;
+    struct grid* tmpg = sheets[a];
+    sheets[a] = sheets[b];
+    sheets[b] = tmpg;
+    char tmpname[SHEETNAMELEN];
+    strncpy(tmpname, sheet_names[a], SHEETNAMELEN - 1);
+    strncpy(sheet_names[a], sheet_names[b], SHEETNAMELEN - 1);
+    strncpy(sheet_names[b], tmpname, SHEETNAMELEN - 1);
+    int tmpcol = sheet_colors[a];
+    sheet_colors[a] = sheet_colors[b];
+    sheet_colors[b] = tmpcol;
+    if (cur_sheet == a) cur_sheet = b;
+    else if (cur_sheet == b) cur_sheet = a;
+}
+
+void setsheetcolor(int idx, int color) {
+    if (idx < 0 || idx >= n_sheets || color < 0 || color > 7) return;
+    sheet_colors[idx] = color;
+}
+
+int sheetbyname(const char* name) {
+    for (int i = 0; i < n_sheets; i++) {
+        if (my_strcasecmp(name, sheet_names[i]) == 0) return i;
+    }
+    return -1;
+}
+
+// Clipboard
+struct clipcell clipboard[CLIPBOARD_MAX];
+int clip_w = 0, clip_h = 0;
+
+void yank_cells(struct grid* g, int c1, int r1, int c2, int r2) {
+    if (c1 > c2) { int t = c1; c1 = c2; c2 = t; }
+    if (r1 > r2) { int t = r1; r1 = r2; r2 = t; }
+    int w = c2 - c1 + 1, h = r2 - r1 + 1;
+    if (w * h > CLIPBOARD_MAX) { w = CLIPBOARD_MAX / h; if (w < 1) { clip_w = clip_h = 0; return; } }
+    int idx = 0;
+    for (int r = r1; r <= r1 + h - 1; r++)
+        for (int c = c1; c <= c1 + w - 1; c++) {
+            struct cell* cl = cell(g, c, r);
+            struct clipcell* cc = &clipboard[idx++];
+            if (cl && cl->type != EMPTY) {
+                cc->type = cl->type;
+                cc->val = cl->val;
+                strncpy(cc->text, cl->text, MAXIN - 1);
+                strncpy(cc->strval, cl->strval, MAXIN - 1);
+                cc->is_str = cl->is_str;
+                cc->fmt = cl->fmt;
+                cc->color = cl->color;
+                cc->bg = cl->bg;
+                cc->attr = cl->attr;
+                strncpy(cc->cond, cl->cond, 63);
+            } else {
+                memset(cc, 0, sizeof(struct clipcell));
+            }
+        }
+    clip_w = w;
+    clip_h = h;
+}
+
+void paste_cells(struct grid* g, int tc, int tr) {
+    if (clip_w < 1 || clip_h < 1) return;
+    int idx = 0;
+    for (int r = 0; r < clip_h; r++) {
+        for (int c = 0; c < clip_w; c++) {
+            int dc = tc + c, dr = tr + r;
+            if (dc >= NCOL || dr >= NROW) { idx++; continue; }
+            struct clipcell* cc = &clipboard[idx++];
+            if (cc->type != EMPTY) {
+                char buf[MAXIN];
+                strncpy(buf, cc->text, MAXIN - 1);
+                setcell(g, dc, dr, buf);
+                // Preserve formatting attributes after setcell
+                struct cell* dst = cell(g, dc, dr);
+                if (dst) {
+                    dst->color = cc->color;
+                    dst->bg = cc->bg;
+                    dst->attr = cc->attr;
+                    strncpy(dst->cond, cc->cond, 63);
+                }
+            } else {
+                struct cell* dst = cell(g, dc, dr);
+                if (dst) *dst = (struct cell){0};
+            }
+        }
+    }
+    recalc(g);
+    g->dirty = 1;
+}
+
+void cut_cells(struct grid* g, int c1, int r1, int c2, int r2) {
+    yank_cells(g, c1, r1, c2, r2);
+    if (c1 > c2) { int t = c1; c1 = c2; c2 = t; }
+    if (r1 > r2) { int t = r1; r1 = r2; r2 = t; }
+    for (int r = r1; r <= r2; r++)
+        for (int c = c1; c <= c2; c++) {
+            struct cell* cl = cell(g, c, r);
+            if (cl) *cl = (struct cell){0};
+        }
+    recalc(g);
+    g->dirty = 1;
 }
 
 

@@ -46,8 +46,9 @@ Press `/` for commands:
     /B            Blank cell
     /C            Clear sheet
     /DR /DC       Delete row/column
+    /E            Sheet explorer (list all sheets, pick by number)
     /IR /IC       Insert row/column
-    /F_           Format cell (L R I G D $ % *)
+    /F_           Format cell (L R I G D $ % * T)
     /FC           Set foreground color (0=blk 1=Red 2=Grn 3=Yel 4=Blu 5=Mag 6=Cyn 7=Wht)
     /FB           Set background color (same 0-7 palette)
     /FO           Set text attribute (0=none 1=Bold 2=Italic 3=Both)
@@ -56,12 +57,27 @@ Press `/` for commands:
     /GC           Set column width
     /GF_          Set global format
     /M            Move row/column (arrow keys to drag)
+    /N            Next sheet
     /O            Sort rows by column (type column letter, e.g. A)
+    /P            Previous sheet
     /R            Replicate (copy with relative refs)
     /SL /SS       Load/Save CSV
     /SQ           Save and quit
     /TV/TH/TB/TN  Lock title rows/columns
+    /V            Paste cells from clipboard
+    /WE           New sheet
+    /WR           Rename current sheet
+    /WD           Delete current sheet
+    /WI           Import CSV into a new sheet
+    /WL /WR       Move sheet tab left/right
+    /WC           Set sheet tab color
+    /X            Cut cells (yank + clear)
+    /Y            Yank (copy) cells to clipboard
     /Q            Quit
+
+Cross-sheet references: `Sheet2!A1` in formulas references cell A1 on Sheet2.
+
+Copy/paste across sheets: yank (`/Y`) or cut (`/X`) cells, navigate to another sheet, paste (`/V`).
 
 Other keys:
 
