@@ -16,7 +16,7 @@ multi-sheet support with cross-sheet references, undo/redo (Ctrl+Z/Y),
 and formula autocomplete with fuzzy matching. Supports both traditional
 (`@SUM(A1...A4)`) and Google Sheets-style (`=SUM(A1:A4)`) syntax.
 
-This is the Power Sheets version, if you want the simple VisiCalc version,
+This is the breakout Power Sheets version, with extra features, if you want the simple VisiCalc 500 lines in one file version,
 it can be found [here](https://github.com/zserge/kalk).
 
 ## Build
@@ -114,55 +114,55 @@ The two syntaxes are fully compatible and can be mixed.
 
 ### Functions
 
-| Function        | Description                                             | Example                         |
-| --------------- | ------------------------------------------------------- | ------------------------------- |
-| `SUM`           | Sum of values (range or comma-separated)                | `=SUM(A1:A10)`                  |
-| `AVERAGE`       | Mean of values (range or comma-separated)               | `=AVERAGE(A1:A10)`              |
-| `MIN`           | Minimum value (range or comma-separated)                | `=MIN(A1:A10)`                  |
-| `MAX`           | Maximum value (range or comma-separated)                | `=MAX(A1:A10)`                  |
-| `COUNT`         | Count of numeric cells (range or comma-separated)       | `=COUNT(A1:A10)`                |
-| `SUMIF`         | Sum range cells matching a condition                    | `=SUMIF(A1:A10, ">5")`          |
-| `COUNTIF`       | Count range cells matching a condition                  | `=COUNTIF(A1:A10, "<>0")`       |
-| `VLOOKUP`       | Search column for key, return from indexed column       | `=VLOOKUP(5, A1:B10, 2)`        |
-| `HLOOKUP`       | Search row for key, return from indexed row             | `=HLOOKUP(5, A1:Z10, 3)`        |
-| `LEN`           | Length of a string                                      | `=LEN(A1)`                      |
-| `FIND`          | Position of substring (1-indexed, NAN if not found)     | `=FIND("abc", A1)`              |
-| `LEFT`          | First N characters of a string                          | `=LEFT(A1, 3)`                  |
-| `RIGHT`         | Last N characters of a string                           | `=RIGHT(A1, 3)`                 |
-| `MID`           | Substring starting at position (1-indexed)              | `=MID(A1, 2, 3)`                |
-| `UPPER`         | Convert to uppercase                                    | `=UPPER(A1)`                    |
-| `LOWER`         | Convert to lowercase                                    | `=LOWER(A1)`                    |
-| `TRIM`          | Remove leading/trailing whitespace                      | `=TRIM(A1)`                     |
-| `CONCATENATE`   | Join strings together (comma-separated args)            | `=CONCATENATE(A1, " ", A2)`     |
-| `ABS`           | Absolute value                                          | `=ABS(A1)`                      |
-| `INT`           | Integer truncation                                      | `=INT(A1)`                      |
-| `SQRT`          | Square root                                             | `=SQRT(A1)`                     |
-| `ROUND`         | Round to N decimal places                               | `=ROUND(A1, 2)`                 |
-| `ROUNDUP`       | Round up                                                | `=ROUNDUP(A1, 2)`               |
-| `ROUNDDOWN`     | Round down                                              | `=ROUNDDOWN(A1, 2)`             |
-| `CEILING`       | Round up to integer                                     | `=CEILING(A1)`                  |
-| `FLOOR`         | Round down to integer                                   | `=FLOOR(A1)`                    |
-| `IF`            | Conditional: if cond, return a else b                   | `=IF(A1>5, A2, A3)`             |
-| `POWER`         | Raise to a power                                        | `=POWER(A1, 2)`                 |
-| `MOD`           | Modulo (remainder)                                      | `=MOD(A1, 3)`                   |
-| `PI`            | The constant pi                                         | `=PI()`                         |
-| `RAND`          | Random number [0, 1)                                    | `=RAND()`                       |
-| `RANDBETWEEN`   | Random integer in [a, b]                                | `=RANDBETWEEN(1, 10)`           |
-| `SIN`           | Sine (radians)                                          | `=SIN(A1)`                      |
-| `COS`           | Cosine (radians)                                        | `=COS(A1)`                      |
-| `TAN`           | Tangent (radians)                                       | `=TAN(A1)`                      |
-| `LOG`           | Natural logarithm                                       | `=LOG(A1)`                      |
-| `DATE`          | Create date from year, month, day                       | `=DATE(2024, 1, 15)`            |
-| `TODAY`         | Current date                                            | `=TODAY()`                      |
-| `NOW`           | Current date and time                                   | `=NOW()`                        |
-| `YEAR`          | Extract year from a date serial                         | `=YEAR(A1)`                     |
-| `MONTH`         | Extract month (1-12) from a date serial                 | `=MONTH(A1)`                    |
-| `DAY`           | Extract day of month (1-31) from a date serial          | `=DAY(A1)`                      |
-| `HOUR`          | Extract hour (0-23) from a date serial                  | `=HOUR(A1)`                     |
-| `MINUTE`        | Extract minute (0-59) from a date serial                | `=MINUTE(A1)`                   |
-| `SECOND`        | Extract second (0-59) from a date serial                | `=SECOND(A1)`                   |
-| `WEEKDAY`       | Day of week (1=Sun..7=Sat); optional type arg           | `=WEEKDAY(A1, 2)`               |
-| `DATEDIF`       | Difference between dates ("Y"/"M"/"D"/"MD"/"YM"/"YD") | `=DATEDIF(A1, A2, "D")`         |
+| Function      | Description                                           | Example                     |
+| ------------- | ----------------------------------------------------- | --------------------------- |
+| `SUM`         | Sum of values (range or comma-separated)              | `=SUM(A1:A10)`              |
+| `AVERAGE`     | Mean of values (range or comma-separated)             | `=AVERAGE(A1:A10)`          |
+| `MIN`         | Minimum value (range or comma-separated)              | `=MIN(A1:A10)`              |
+| `MAX`         | Maximum value (range or comma-separated)              | `=MAX(A1:A10)`              |
+| `COUNT`       | Count of numeric cells (range or comma-separated)     | `=COUNT(A1:A10)`            |
+| `SUMIF`       | Sum range cells matching a condition                  | `=SUMIF(A1:A10, ">5")`      |
+| `COUNTIF`     | Count range cells matching a condition                | `=COUNTIF(A1:A10, "<>0")`   |
+| `VLOOKUP`     | Search column for key, return from indexed column     | `=VLOOKUP(5, A1:B10, 2)`    |
+| `HLOOKUP`     | Search row for key, return from indexed row           | `=HLOOKUP(5, A1:Z10, 3)`    |
+| `LEN`         | Length of a string                                    | `=LEN(A1)`                  |
+| `FIND`        | Position of substring (1-indexed, NAN if not found)   | `=FIND("abc", A1)`          |
+| `LEFT`        | First N characters of a string                        | `=LEFT(A1, 3)`              |
+| `RIGHT`       | Last N characters of a string                         | `=RIGHT(A1, 3)`             |
+| `MID`         | Substring starting at position (1-indexed)            | `=MID(A1, 2, 3)`            |
+| `UPPER`       | Convert to uppercase                                  | `=UPPER(A1)`                |
+| `LOWER`       | Convert to lowercase                                  | `=LOWER(A1)`                |
+| `TRIM`        | Remove leading/trailing whitespace                    | `=TRIM(A1)`                 |
+| `CONCATENATE` | Join strings together (comma-separated args)          | `=CONCATENATE(A1, " ", A2)` |
+| `ABS`         | Absolute value                                        | `=ABS(A1)`                  |
+| `INT`         | Integer truncation                                    | `=INT(A1)`                  |
+| `SQRT`        | Square root                                           | `=SQRT(A1)`                 |
+| `ROUND`       | Round to N decimal places                             | `=ROUND(A1, 2)`             |
+| `ROUNDUP`     | Round up                                              | `=ROUNDUP(A1, 2)`           |
+| `ROUNDDOWN`   | Round down                                            | `=ROUNDDOWN(A1, 2)`         |
+| `CEILING`     | Round up to integer                                   | `=CEILING(A1)`              |
+| `FLOOR`       | Round down to integer                                 | `=FLOOR(A1)`                |
+| `IF`          | Conditional: if cond, return a else b                 | `=IF(A1>5, A2, A3)`         |
+| `POWER`       | Raise to a power                                      | `=POWER(A1, 2)`             |
+| `MOD`         | Modulo (remainder)                                    | `=MOD(A1, 3)`               |
+| `PI`          | The constant pi                                       | `=PI()`                     |
+| `RAND`        | Random number [0, 1)                                  | `=RAND()`                   |
+| `RANDBETWEEN` | Random integer in [a, b]                              | `=RANDBETWEEN(1, 10)`       |
+| `SIN`         | Sine (radians)                                        | `=SIN(A1)`                  |
+| `COS`         | Cosine (radians)                                      | `=COS(A1)`                  |
+| `TAN`         | Tangent (radians)                                     | `=TAN(A1)`                  |
+| `LOG`         | Natural logarithm                                     | `=LOG(A1)`                  |
+| `DATE`        | Create date from year, month, day                     | `=DATE(2024, 1, 15)`        |
+| `TODAY`       | Current date                                          | `=TODAY()`                  |
+| `NOW`         | Current date and time                                 | `=NOW()`                    |
+| `YEAR`        | Extract year from a date serial                       | `=YEAR(A1)`                 |
+| `MONTH`       | Extract month (1-12) from a date serial               | `=MONTH(A1)`                |
+| `DAY`         | Extract day of month (1-31) from a date serial        | `=DAY(A1)`                  |
+| `HOUR`        | Extract hour (0-23) from a date serial                | `=HOUR(A1)`                 |
+| `MINUTE`      | Extract minute (0-59) from a date serial              | `=MINUTE(A1)`               |
+| `SECOND`      | Extract second (0-59) from a date serial              | `=SECOND(A1)`               |
+| `WEEKDAY`     | Day of week (1=Sun..7=Sat); optional type arg         | `=WEEKDAY(A1, 2)`           |
+| `DATEDIF`     | Difference between dates ("Y"/"M"/"D"/"MD"/"YM"/"YD") | `=DATEDIF(A1, A2, "D")`     |
 
 String arguments can be cell references (A1), string literals (`"hello"`),
 or expressions. Functions that return strings (UPPER, LOWER, TRIM, LEFT,
@@ -223,6 +223,7 @@ Date arithmetic works naturally: `=A1+7` on a date cell shifts it by 7
 days. Use `/F P` to open a date picker popup for visual selection.
 
 Cell formats for date/time display:
+
 - `T` — YYYY-MM-DD (includes time if present)
 - `U` — MM/DD/YYYY
 - `u` — DD-Mon-YYYY (e.g. 15-Jan-2024)
@@ -247,6 +248,7 @@ with up to 4096 cells per entry.
 ### Auto-fill patterns
 
 The `/A` command detects and extends several pattern types from seed cells:
+
 - **Linear arithmetic**: 1, 2, 3 → 4, 5, 6... or 10, 20, 30 → 40, 50...
 - **Day names**: Mon, Tue, Wed... or Monday, Tuesday...
 - **Month names**: Jan, Feb, Mar... or January, February...
